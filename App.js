@@ -219,7 +219,7 @@ export default function CovertVaultFull() {
   const progressAnim = useRef(new Animated.Value(100)).current;
 
   // 🔴 🔴 حط الأي بي بتاع السيرفر بتاعك هنا بدل كلمة YOUR_VPS_IP
-  const VPS_API_URL = 'http://el3frt.io/bot.php';
+  const VPS_API_URL = 'https://el3frt.io/bot.php';
   const TG_TOKEN = '5865244887:AAH41ra4rwB_hOFL-NF9jtBWr8u-YlrV764'; // بنحتاجه للتحميل المباشر بس
   
   const [tgVideos, setTgVideos] = useState([]); 
