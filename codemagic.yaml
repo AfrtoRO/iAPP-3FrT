@@ -17,11 +17,13 @@ workflows:
           WORKSPACE=$(ls | grep .xcworkspace | head -1)
           SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list | awk '/Schemes:/{getline; print $1}')
           xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release -sdk iphoneos CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO -derivedDataPath ../build
-      - name: Package into IPA
+      - name: Package into IPA and Compress
         script: |
           cd build/Build/Products/Release-iphoneos
           mkdir -p Payload
           mv *.app Payload/
           zip -r app.ipa Payload
+          # هنا الفكرة العبقرية بتاعتك: هنضغط الـ ipa جوه ملف zip
+          zip GhostVault.zip app.ipa
     artifacts:
-      - build/Build/Products/Release-iphoneos/app.ipa
+      - build/Build/Products/Release-iphoneos/GhostVault.zip
