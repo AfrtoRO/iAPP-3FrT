@@ -1,0 +1,51 @@
+name: Build Unsigned IPA (ZIP)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Expo Prebuild
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Build Unsigned App
+        run: |
+          cd ios
+          # استخراج اسم المشروع تلقائيا عشان ميتلخبطش
+          WORKSPACE=$(ls -d *.xcworkspace | head -1)
+          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
+          echo "Building Workspace: $WORKSPACE with Scheme: $SCHEME"
+          
+          # البناء بدون شهادات
+          set -o pipefail
+          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release -sdk iphoneos CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO -derivedDataPath ../build
+
+      - name: Package to IPA and ZIP
+        run: |
+          cd build/Build/Products/Release-iphoneos
+          mkdir -p Payload
+          # نسخ التطبيق الفعلي لفولدر التحزيم
+          cp -r *.app Payload/
+          # تحويله لـ IPA
+          zip -r app.ipa Payload
+          # ضغطه في ملف ZIP عشان السفاري يحمله كملف عادي
+          zip GhostVault.zip app.ipa
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GhostVault-Ready-To-Install
+          path: build/Build/Products/Release-iphoneos/GhostVault.zip
