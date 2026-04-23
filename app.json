@@ -13,7 +13,12 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.i3frt.app"
+      "bundleIdentifier": "com.i3frt.app",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photos to let you lock and encrypt them in the secure vault.",
+        "NSPhotoLibraryAddUsageDescription": "This app needs permission to save encrypted media to your library.",
+        "NSCameraUsageDescription": "This app needs access to the camera to take secure photos directly into the vault."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -29,7 +34,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow app to access your photos"
+          "photosPermission": "The app accesses your photos to let you hide them securely."
         }
       ],
       [
@@ -41,8 +46,8 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "Allow app to access your photos",
-          "savePhotosPermission": "Allow app to save photos"
+          "photosPermission": "Allow app to access and hide your media files.",
+          "savePhotosPermission": "Allow app to save your encrypted media."
         }
       ]
     ]
