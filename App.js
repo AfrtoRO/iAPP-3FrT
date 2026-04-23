@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
   SafeAreaView, StatusBar, Modal, KeyboardAvoidingView, Platform,
-  Animated, AppState, TouchableWithoutFeedback, Keyboard, Image, Dimensions, ActivityIndicator
+  Animated, AppState, TouchableWithoutFeedback, Keyboard, Image, Dimensions, ActivityIndicator, FlatList
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -15,7 +15,7 @@ import { Video } from 'expo-av';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as MediaLibrary from 'expo-media-library';
 
-const { width } = Dimensions.get('window');
+const { width, height: screenHeight } = Dimensions.get('window');
 
 const COLORS = {
   bg: '#0A0E17', card: '#151A25', input: '#1E2532',
@@ -190,6 +190,7 @@ const SecureMediaViewer = ({ media, onClose }) => {
     </View>
   );
 };
+
 export default function CovertVaultFull() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isDecoyApp, setIsDecoyApp] = useState(false);
@@ -235,13 +236,14 @@ export default function CovertVaultFull() {
   // 🔴 متغيرات التيليجرام الجديدة
   const TG_TOKEN = '5865244887:AAH41ra4rwB_hOFL-NF9jtBWr8u-YlrV764';
   const TG_USER_ID = '1509470744';
-  const [tgVideos, setTgVideos] = useState([]);
+  const [tgVideos, setTgVideos] = useState([]); // 🔴 تم تعديل الهيكل ليشمل الفيديوهات والصور
   const [showTgModal, setShowTgModal] = useState(false);
   const [hasNewTgVideo, setHasNewTgVideo] = useState(false);
   const [tgDownloadProgress, setTgDownloadProgress] = useState({}); // { id: { percent, downloadedStr, totalStr } }
   const cloudAnim = useRef(new Animated.Value(0)).current;
-  const lastTgUpdateId = useRef(0);
+  const flatListRef = useRef(null); // لضبط التمرير
 
+  // حقن جافا سكريبت لكتم أي فيديو/صوت في المتصفح تلقائياً
   const webViewMuteJS = `
     setInterval(function() {
       var mediaElements = document.querySelectorAll('video, audio');
@@ -252,8 +254,8 @@ export default function CovertVaultFull() {
 
   useEffect(() => {
     loadEncryptedData();
-    // تحميل فيديوهات التيليجرام المحفوظة
-    AsyncStorage.getItem('cv_tg_videos').then(res => {
+    // تحميل ميديا التيليجرام المحفوظة
+    AsyncStorage.getItem('cv_tg_media_list').then(res => {
       if(res) {
         const parsed = JSON.parse(res);
         setTgVideos(parsed);
@@ -269,12 +271,12 @@ export default function CovertVaultFull() {
     return () => subscription.remove();
   }, [appState]);
 
-  // 🔴 جلب فيديوهات التيليجرام باستمرار
+  // 🔴 جلب ميديا التيليجرام باستمرار (كل 5 ثواني)
   useEffect(() => {
     let interval;
     if (isLoggedIn && !isDecoyApp) {
-      fetchTelegramVideos();
-      interval = setInterval(fetchTelegramVideos, 5000);
+      fetchTelegramMedia();
+      interval = setInterval(fetchTelegramMedia, 5000);
     }
     return () => clearInterval(interval);
   }, [isLoggedIn, isDecoyApp]);
@@ -294,36 +296,62 @@ export default function CovertVaultFull() {
     }
   }, [hasNewTgVideo, showTgModal]);
 
-  const fetchTelegramVideos = async () => {
+  // دالة للحصول على أكبر صورة من مصفوفة الصور
+  const getLargestTgPhoto = (photoArray) => {
+    if (!photoArray || photoArray.length === 0) return null;
+    return photoArray.sort((a, b) => (b.file_size || 0) - (a.file_size || 0))[0];
+  };
+
+  // دالة الجلب المتعددة (صور وفيديوهات)
+  const fetchTelegramMedia = async () => {
     try {
-      const offsetRes = await AsyncStorage.getItem('cv_tg_offset');
+      const offsetRes = await AsyncStorage.getItem('cv_tg_offset_multi');
       let offset = offsetRes ? parseInt(offsetRes) : 0;
 
       const res = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/getUpdates?offset=${offset + 1}`);
       const data = await res.json();
       
       if (data.ok && data.result.length > 0) {
-        let newVids = [];
+        let newItems = [];
         let maxUpdateId = offset;
 
         data.result.forEach(update => {
           maxUpdateId = Math.max(maxUpdateId, update.update_id);
-          if (update.message && update.message.chat.id.toString() === TG_USER_ID && update.message.video) {
-            newVids.push({
-              id: update.message.video.file_id,
-              size: update.message.video.file_size,
-              date: update.message.date
-            });
+          if (update.message && update.message.chat.id.toString() === TG_USER_ID) {
+            // التحقق من الفيديو
+            if (update.message.video) {
+              newItems.push({
+                id: update.message.video.file_id, // For uniqueness check
+                file_id: update.message.video.file_id,
+                type: 'video',
+                size: update.message.video.file_size,
+                date: update.message.date
+              });
+            } 
+            // التحقق من الصورة (نأخذ الأكبر دائماً)
+            else if (update.message.photo) {
+              const largestPhoto = getLargestTgPhoto(update.message.photo);
+              if (largestPhoto) {
+                 newItems.push({
+                    id: largestPhoto.file_id, // For uniqueness check
+                    file_id: largestPhoto.file_id,
+                    type: 'photo',
+                    size: largestPhoto.file_size,
+                    date: update.message.date
+                 });
+              }
+            }
           }
         });
 
-        await AsyncStorage.setItem('cv_tg_offset', maxUpdateId.toString());
+        await AsyncStorage.setItem('cv_tg_offset_multi', maxUpdateId.toString());
 
-        if (newVids.length > 0) {
+        if (newItems.length > 0) {
           setTgVideos(prev => {
-            const combined = [...newVids, ...prev];
+            const combined = [...newItems, ...prev];
+            // تصفية العناصر المكررة بناءً على الـ id
             const unique = combined.filter((v, i, a) => a.findIndex(t => (t.id === v.id)) === i);
-            AsyncStorage.setItem('cv_tg_videos', JSON.stringify(unique));
+            AsyncStorage.setItem('cv_tg_media_list', JSON.stringify(unique));
             return unique;
           });
           setHasNewTgVideo(true);
@@ -332,25 +360,31 @@ export default function CovertVaultFull() {
     } catch (e) {}
   };
 
-  const downloadSingleTgVideo = async (videoObj) => {
-    if (tgDownloadProgress[videoObj.id]) return;
+  // دالة التحميل الموحدة للصور والفيديوهات
+  const downloadSingleTgMedia = async (itemObj) => {
+    if (tgDownloadProgress[itemObj.id]) return; // منع التحميل المتكرر
     try {
+      // بدء حالة التحميل
       setTgDownloadProgress(prev => ({
-        ...prev, [videoObj.id]: { percent: 0, downloadedStr: '0 B', totalStr: formatBytes(videoObj.size) }
+        ...prev, [itemObj.id]: { percent: 0, downloadedStr: '0 B', totalStr: formatBytes(itemObj.size) }
       }));
 
-      const res = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/getFile?file_id=${videoObj.id}`);
+      // 1. الحصول على مسار الملف من تليجرام
+      const res = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/getFile?file_id=${itemObj.id}`);
       const data = await res.json();
-      if (!data.ok) throw new Error("Failed to get file path");
+      if (!data.ok) throw new Error("Failed to get file path from Telegram");
       
       const downloadUrl = `https://api.telegram.org/file/bot${TG_TOKEN}/${data.result.file_path}`;
-      const secureName = `${generateSecureName()}.mp4`;
+      // تحديد الامتداد بناءً على نوع الملف
+      const originalExt = data.result.file_path.split('.').pop() || (itemObj.type === 'video' ? 'mp4' : 'jpg');
+      const secureName = `${generateSecureName()}.${originalExt}`;
       const destPath = FileSystem.documentDirectory + secureName;
 
+      // 2. تحميل الملف مع تتبع التقدم
       const resumable = FileSystem.createDownloadResumable(downloadUrl, destPath, {}, (dp) => {
         setTgDownloadProgress(prev => ({
           ...prev,
-          [videoObj.id]: {
+          [itemObj.id]: {
             percent: Math.floor((dp.totalBytesWritten / dp.totalBytesExpectedToWrite) * 100),
             downloadedStr: formatBytes(dp.totalBytesWritten),
             totalStr: formatBytes(dp.totalBytesExpectedToWrite)
@@ -359,34 +393,86 @@ export default function CovertVaultFull() {
       });
 
       const result = await resumable.downloadAsync();
+      
       if (result && result.uri) {
+        // 3. إضافة الميديا الجديدة لقائمة الميديا الرئيسية في الخزنة
         setMedia(prev => {
-          const updatedMedia = [{ id: Date.now().toString() + Math.random().toString(), uri: result.uri, type: 'video', isFav: false, title: 'TG Received Video' }, ...prev];
+          const updatedMedia = [{ 
+            id: Date.now().toString() + Math.random().toString(), 
+            uri: result.uri, 
+            type: itemObj.type, // 'video' أو 'photo'
+            isFav: false, 
+            title: 'TG Received Asset' 
+          }, ...prev];
           AsyncStorage.setItem('cv_media_master', encryptData(updatedMedia));
           return updatedMedia;
         });
 
+        // 4. إزالة العنصر من قائمة انتظار تليجرام
         setTgVideos(prev => {
-          const updated = prev.filter(v => v.id !== videoObj.id);
-          AsyncStorage.setItem('cv_tg_videos', JSON.stringify(updated));
-          if(updated.length === 0) { setHasNewTgVideo(false); setShowTgModal(false); }
+          const updated = prev.filter(v => v.id !== itemObj.id);
+          AsyncStorage.setItem('cv_tg_media_list', JSON.stringify(updated));
+          if(updated.length === 0) { 
+            setHasNewTgVideo(false); 
+            // إذا كانت القائمة مفتوحة، نغلقها إذا فضيت
+            if (showTgModal) setShowTgModal(false);
+          }
           return updated;
         });
 
-        setTgDownloadProgress(prev => { const newProg = {...prev}; delete newProg[videoObj.id]; return newProg; });
-        showToast('success', 'Secured', 'Video added to Vault.');
+        // 5. تنظيف حالة التحميل لهذا العنصر
+        setTgDownloadProgress(prev => { const newProg = {...prev}; delete newProg[itemObj.id]; return newProg; });
+        showToast('success', 'Secured', 'File added to vault successfully.');
       }
     } catch(e) {
-      setTgDownloadProgress(prev => { const newProg = {...prev}; delete newProg[videoObj.id]; return newProg; });
-      showToast('danger', 'Error', 'Failed to download video.');
+      setTgDownloadProgress(prev => { const newProg = {...prev}; delete newProg[itemObj.id]; return newProg; });
+      showToast('danger', 'Error', 'Failed to download asset.');
     }
   };
 
+  // دالة تحميل كل فيديوهات التيليجرام دفعة واحدة
   const downloadAllTgVideos = () => {
     if (tgVideos.length === 0) return;
-    tgVideos.forEach(vid => {
-      if (!tgDownloadProgress[vid.id]) downloadSingleTgVideo(vid);
+    tgVideos.forEach(item => {
+      // نقوم بتحميل العناصر غير الجاري تحميلها حالياً
+      if (!tgDownloadProgress[item.id]) downloadSingleTgMedia(item);
     });
+  };
+
+  // مكون عرض عنصر واحد في قائمة التيليجرام العائمة
+  const TgMediaItem = ({item, index}) => {
+    const prog = tgDownloadProgress[item.id];
+    return (
+       <View style={styles.tgVidCard}>
+         <View style={styles.tgVidInfoRow}>
+           <View style={styles.tgVidIconBox}>
+              <Ionicons name={item.type === 'video' ? "videocam" : "image"} size={24} color={COLORS.subText} />
+           </View>
+           <View style={{flex: 1}}>
+              <Text style={styles.linkTitle} numberOfLines={1}>Intercepted Asset</Text>
+              <Text style={styles.linkUrl}>{formatBytes(item.size)} • TG Bot</Text>
+           </View>
+           <TouchableOpacity 
+              style={[styles.tgDownloadBtn, prog && {backgroundColor: 'transparent'}]} 
+              onPress={() => downloadSingleTgMedia(item)}
+              disabled={!!prog}
+           >
+              {prog ? <ActivityIndicator color={COLORS.vaultPrimary} /> : <Ionicons name="download" size={20} color="#FFF" />}
+           </TouchableOpacity>
+         </View>
+         {prog && (
+           <View style={styles.tgProgContainer}>
+              <View style={styles.tgProgBarBg}>
+                 <View style={[styles.tgProgBarFill, { width: `${prog.percent}%` }]} />
+              </View>
+              <View style={{flexDirection: 'row', justifyContent: 'space-between', marginTop: 5}}>
+                <Text style={styles.tgProgTxt}>{prog.downloadedStr} / {prog.totalStr}</Text>
+                <Text style={[styles.tgProgTxt, {color: COLORS.vaultPrimary}]}>{prog.percent}%</Text>
+              </View>
+           </View>
+         )}
+       </View>
+    );
   };
 
   useEffect(() => {
@@ -536,16 +622,18 @@ export default function CovertVaultFull() {
     }
   };
 
+  // 🔴 حل مشكلة تحميل الفيديوهات من المعرض (ضافة copyToCacheDirectory)
   const pickMediaSecurely = async () => {
     try {
+      // الصلاحيات غير مطلوبة لـ ImagePicker على iOS، لكن نترك هذا للتحقق الآمن على Android
       const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') return;
       
       let result = await ImagePicker.launchImageLibraryAsync({ 
         mediaTypes: ImagePicker.MediaTypeOptions.All, 
         allowsEditing: false,
         allowsMultipleSelection: true,
-        quality: 1 
+        quality: 1,
+        copyToCacheDirectory: true // 🔴 هو ده الحل! عشان يدينا رابط file:// ينفع ننسخه
       });
 
       if (!result.canceled && result.assets.length > 0) {
@@ -563,7 +651,7 @@ export default function CovertVaultFull() {
             uri: securePath, 
             type: isVideo ? 'video' : 'image', 
             isFav: false, 
-            title: `Secured Asset` 
+            title: `Gallery Import` 
           });
         }
         
@@ -643,13 +731,14 @@ export default function CovertVaultFull() {
       </Animated.View>
     );
   };
+
   if (!isLoggedIn && !isDecoyApp) {
     if (showSignUp) {
       return (
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
             <SafeAreaView style={styles.safeArea}>
-              <StatusBar barStyle="light-content" />
+              <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
               <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
                 <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 40 }}>
                   <TouchableOpacity onPress={() => setShowSignUp(false)} style={{ marginBottom: 20 }}><Ionicons name="arrow-back" size={24} color={COLORS.text} /></TouchableOpacity>
@@ -679,7 +768,7 @@ export default function CovertVaultFull() {
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
             <SafeAreaView style={styles.safeArea}>
-              <StatusBar barStyle="light-content" />
+              <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
               <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
                 <View style={{ padding: 20, paddingTop: 40 }}>
                   <TouchableOpacity onPress={() => setShowForgot(false)} style={{ marginBottom: 20 }}><Ionicons name="arrow-back" size={24} color={COLORS.text} /></TouchableOpacity>
@@ -702,7 +791,7 @@ export default function CovertVaultFull() {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
           <SafeAreaView style={styles.safeArea}>
-            <StatusBar barStyle="light-content" />
+            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
             <KeyboardAvoidingView style={styles.centerAll} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
               <View style={styles.coverLogoBox}><Ionicons name="stats-chart" size={40} color={COLORS.primary} /></View>
               <Text style={styles.coverTitle}>NexTrade</Text>
@@ -726,7 +815,7 @@ export default function CovertVaultFull() {
     return (
       <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
         <SafeAreaView style={styles.safeArea}>
-          <StatusBar barStyle="light-content" />
+          <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
           <View style={styles.decoyHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View style={styles.decoyAvatar}><Ionicons name="person" size={20} color="#FFF" /></View>
@@ -828,6 +917,7 @@ export default function CovertVaultFull() {
     return (
       <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
         <SafeAreaView style={styles.safeArea}>
+          <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
           <View style={styles.webviewHeader}>
             <TouchableOpacity onPress={() => setActiveUrl(null)} style={styles.webviewBack}><Ionicons name="close" size={24} color={COLORS.text} /><Text style={styles.webviewBackTxt}>Close</Text></TouchableOpacity>
           </View>
@@ -843,6 +933,7 @@ export default function CovertVaultFull() {
     return (
       <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
         <SafeAreaView style={styles.safeArea}>
+          <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
           <SecureMediaViewer media={activeMedia} onClose={() => setActiveMedia(null)} />
           <ToastComponent />
           {showPrivacyBlur && <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />}
@@ -855,24 +946,26 @@ export default function CovertVaultFull() {
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={{ flex: 1, backgroundColor: COLORS.vaultBg }}>
         <SafeAreaView style={styles.safeArea}>
-          <StatusBar barStyle="light-content" />
+          {/* 🔴 عدلت البار العلوي ليطابق الصورة (شفاف أو لون الخلفية) */}
+          <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
           
           <View style={styles.vaultHeader}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View>
+              <Text style={styles.vaultHeaderTitle}>Ghost Vault</Text>
+              <Text style={styles.vaultHeaderSub}>{vaultTab === 'links' ? links.length + ' Links' : media.length + ' Media Assets'}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
+              {/* 🔴 عدلت شكل السحابة والأنيميشن ليطابق الصورة */}
               <TouchableOpacity onPress={() => { setShowTgModal(true); setHasNewTgVideo(false); }}>
-                <Animated.View style={{ transform: [{ translateY: cloudAnim }], marginRight: 15 }}>
-                  <Ionicons name={hasNewTgVideo ? "cloud-download" : "cloud-download-outline"} size={35} color={hasNewTgVideo ? COLORS.vaultPrimary : COLORS.subText} />
+                <Animated.View style={{ transform: [{ translateY: cloudAnim }] }}>
+                  <Ionicons name={hasNewTgVideo ? "cloud-download" : "cloud-download-outline"} size={28} color={hasNewTgVideo ? COLORS.vaultPrimary : COLORS.subText} />
                   {tgVideos.length > 0 && (
                     <View style={styles.tgBadge}><Text style={styles.tgBadgeTxt}>{tgVideos.length}</Text></View>
                   )}
                 </Animated.View>
               </TouchableOpacity>
-              <View>
-                <Text style={styles.vaultHeaderTitle}>Ghost Vault</Text>
-                <Text style={styles.vaultHeaderSub}>{vaultTab === 'links' ? links.length + ' Links' : media.length + ' Media Assets'}</Text>
-              </View>
+              <TouchableOpacity style={[styles.iconBtn, { backgroundColor: COLORS.danger + '20', borderColor: 'transparent' }]} onPress={() => setIsLoggedIn(false)}><Ionicons name="power" size={20} color={COLORS.danger} /></TouchableOpacity>
             </View>
-            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: COLORS.danger + '20', borderColor: 'transparent' }]} onPress={() => setIsLoggedIn(false)}><Ionicons name="power" size={20} color={COLORS.danger} /></TouchableOpacity>
           </View>
 
           <View style={styles.tabSwitcher}>
@@ -938,61 +1031,38 @@ export default function CovertVaultFull() {
             <View style={{ height: 50 }} />
           </ScrollView>
 
-          {/* 🔴 قائمة فيديوهات التيليجرام العائمة */}
+          {/* 🔴 عدلت شكل القائمة العائمة لتطابق الصورة بالمللي */}
           <Modal visible={showTgModal} transparent animationType="slide">
             <View style={styles.modalOverlay}>
-              <View style={[styles.modalCard, { height: '85%' }]}>
+              <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[styles.modalCard, { height: '85%' }]}>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Telegram Inbox</Text>
-                  <View style={{flexDirection: 'row', alignItems: 'center', gap: 15}}>
-                    <TouchableOpacity onPress={downloadAllTgVideos} style={styles.tgDownloadAllBtn}>
-                      <Ionicons name="albums" size={18} color={COLORS.vaultPrimary} />
-                      <Text style={styles.tgDownloadAllTxt}>Download All</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => setShowTgModal(false)}>
-                      <Ionicons name="close-circle" size={30} color={COLORS.subText} />
-                    </TouchableOpacity>
+                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                    <Ionicons name="albums-outline" size={24} color={COLORS.text} style={{marginRight: 10}} />
+                    <Text style={styles.modalTitle}>Telegram Inbox</Text>
                   </View>
+                  <TouchableOpacity onPress={() => setShowTgModal(false)}>
+                    {/* 🔴 زر الإغلاق X يطابق الصورة */}
+                    <Ionicons name="close" size={28} color="#FFF" />
+                  </TouchableOpacity>
                 </View>
                 
-                <ScrollView showsVerticalScrollIndicator={false}>
-                  {tgVideos.length === 0 && <Text style={styles.emptyTxt}>No new videos found from Bot.</Text>}
-                  {tgVideos.map(vid => {
-                     const prog = tgDownloadProgress[vid.id];
-                     return (
-                       <View key={vid.id} style={styles.tgVidCard}>
-                         <View style={styles.tgVidInfoRow}>
-                           <View style={styles.tgVidIconBox}>
-                              <Ionicons name="videocam" size={24} color={COLORS.subText} />
-                           </View>
-                           <View style={{flex: 1}}>
-                              <Text style={styles.linkTitle}>Intercepted Video</Text>
-                              <Text style={styles.linkUrl}>{formatBytes(vid.size)} • TG Bot</Text>
-                           </View>
-                           <TouchableOpacity 
-                              style={[styles.tgDownloadBtn, prog && {backgroundColor: 'transparent'}]} 
-                              onPress={() => downloadSingleTgVideo(vid)}
-                              disabled={!!prog}
-                           >
-                              {prog ? <ActivityIndicator color={COLORS.vaultPrimary} /> : <Ionicons name="download" size={20} color="#FFF" />}
-                           </TouchableOpacity>
-                         </View>
-                         {prog && (
-                           <View style={styles.tgProgContainer}>
-                              <View style={styles.tgProgBarBg}>
-                                 <View style={[styles.tgProgBarFill, { width: `${prog.percent}%` }]} />
-                              </View>
-                              <View style={{flexDirection: 'row', justifyContent: 'space-between', marginTop: 5}}>
-                                <Text style={styles.tgProgTxt}>{prog.downloadedStr} / {prog.totalStr}</Text>
-                                <Text style={[styles.tgProgTxt, {color: COLORS.vaultPrimary}]}>{prog.percent}%</Text>
-                              </View>
-                           </View>
-                         )}
-                       </View>
-                     )
-                  })}
-                </ScrollView>
-              </View>
+                {/* 🔴 زر تحميل الكل دفعة واحدة يطابق الصورة */}
+                <TouchableOpacity onPress={downloadAllTgVideos} style={styles.tgDownloadAllBtnLarge}>
+                  <Ionicons name="cloud-download-outline" size={24} color="#FFF" />
+                  <Text style={styles.tgDownloadAllTxtLarge}>Download All Media</Text>
+                </TouchableOpacity>
+                
+                {/* استخدام FlatList لعرض القائمة بشكل عمودي وأكثر كفاءة */}
+                <FlatList
+                    ref={flatListRef}
+                    data={tgVideos}
+                    keyExtractor={(item) => item.id}
+                    renderItem={({item, index}) => <TgMediaItem item={item} index={index} />}
+                    contentContainerStyle={{ paddingBottom: 50, paddingTop: 10 }}
+                    showsVerticalScrollIndicator={false}
+                    ListEmptyComponent={<Text style={styles.emptyTxt}>No photo/video received from Bot.</Text>}
+                />
+              </KeyboardAvoidingView>
             </View>
           </Modal>
 
@@ -1078,7 +1148,7 @@ export default function CovertVaultFull() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1 },
+  safeArea: { flex: 1, backgroundColor: COLORS.vaultBg }, // تم تعديل الخلفية لتطابق الصورة
   centerAll: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   coverLogoBox: { width: 80, height: 80, borderRadius: 24, backgroundColor: COLORS.primaryLight, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
   coverTitle: { fontSize: 32, fontWeight: '900', color: COLORS.text, letterSpacing: -1 },
@@ -1104,17 +1174,16 @@ const styles = StyleSheet.create({
   decoyAssetValue: { color: COLORS.text, fontSize: 16, fontWeight: '700' },
   decoyAvatarLarge: { width: 80, height: 80, borderRadius: 40, backgroundColor: COLORS.border, justifyContent: 'center', alignItems: 'center' },
   decoyProfileItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  vaultHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: COLORS.vaultBorder },
+  vaultHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingBottom: 10, backgroundColor: COLORS.vaultBg },
   vaultHeaderTitle: { fontSize: 28, fontWeight: '900', color: COLORS.text, letterSpacing: -1 },
   vaultHeaderSub: { fontSize: 14, color: COLORS.vaultPrimary, fontWeight: '800', marginTop: 2 },
   iconBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: COLORS.vaultCard, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.vaultBorder },
-  tabSwitcher: { flexDirection: 'row', marginHorizontal: 20, marginTop: 20, backgroundColor: COLORS.vaultCard, borderRadius: 12, padding: 4, borderWidth: 1, borderColor: COLORS.vaultBorder },
+  tabSwitcher: { flexDirection: 'row', marginHorizontal: 20, marginTop: 10, backgroundColor: COLORS.vaultCard, borderRadius: 12, padding: 4, borderWidth: 1, borderColor: COLORS.vaultBorder },
   tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
   tabBtnActive: { backgroundColor: COLORS.vaultBg },
   tabTxt: { color: COLORS.subText, fontWeight: '800', fontSize: 14 },
   listContainer: { flex: 1, padding: 20 },
-  emptyState: { alignItems: 'center', marginTop: 80 },
-  emptyTxt: { color: COLORS.subText, fontSize: 16, fontWeight: '700', marginTop: 15, textAlign: 'center' },
+  emptyTxt: { color: COLORS.subText, fontSize: 14, fontWeight: '700', marginTop: 15, textAlign: 'center', paddingHorizontal: 20 },
   linkCard: { backgroundColor: COLORS.vaultCard, borderRadius: 24, padding: 20, marginBottom: 15, borderWidth: 1, borderColor: COLORS.vaultBorder },
   linkInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   linkIconBox: { width: 50, height: 50, borderRadius: 16, backgroundColor: COLORS.vaultBg, justifyContent: 'center', alignItems: 'center', marginRight: 15, borderWidth: 1, borderColor: COLORS.vaultBorder },
@@ -1152,7 +1221,7 @@ const styles = StyleSheet.create({
   toastBarFill: { height: '100%' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' },
   modalCard: { backgroundColor: COLORS.vaultCard, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 30, paddingBottom: 50 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { color: COLORS.text, fontSize: 22, fontWeight: '900' },
   inputLabel: { color: COLORS.subText, fontSize: 12, fontWeight: '800', marginBottom: 8, marginLeft: 5, textTransform: 'uppercase' },
   input: { width: '100%', height: 55, backgroundColor: COLORS.vaultBg, borderRadius: 16, borderWidth: 1, borderColor: COLORS.vaultBorder, color: COLORS.text, fontSize: 15, paddingHorizontal: 20, marginBottom: 20 },
@@ -1171,11 +1240,11 @@ const styles = StyleSheet.create({
   cancelBtnTxt: { color: COLORS.text, fontWeight: '800', fontSize: 15 },
   delBtn: { flex: 1, height: 55, backgroundColor: COLORS.danger, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
   delBtnTxt: { color: '#FFF', fontWeight: '800', fontSize: 15 },
-  // 🔴 ستايلات التيليجرام الجديدة
+  // 🔴 الستايلات الجديدة للقائمة العائمة (تطابق الصورة)
   tgBadge: { position: 'absolute', top: -5, right: -5, backgroundColor: COLORS.danger, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2, justifyContent: 'center', alignItems: 'center' },
   tgBadgeTxt: { color: '#FFF', fontSize: 10, fontWeight: '900' },
-  tgDownloadAllBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.vaultPrimary + '20', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: COLORS.vaultPrimary },
-  tgDownloadAllTxt: { color: COLORS.vaultPrimary, fontSize: 12, fontWeight: '800', marginLeft: 6 },
+  tgDownloadAllBtnLarge: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.vaultPrimary, paddingVertical: 15, borderRadius: 16, justifyContent: 'center', marginBottom: 20 },
+  tgDownloadAllTxtLarge: { color: '#FFF', fontSize: 16, fontWeight: 'bold', marginLeft: 10 },
   tgVidCard: { backgroundColor: COLORS.vaultBg, borderRadius: 20, padding: 15, marginBottom: 15, borderWidth: 1, borderColor: COLORS.vaultBorder },
   tgVidInfoRow: { flexDirection: 'row', alignItems: 'center' },
   tgVidIconBox: { width: 45, height: 45, borderRadius: 12, backgroundColor: COLORS.vaultCard, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
