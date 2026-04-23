@@ -45,7 +45,6 @@ const formatTime = (millis) => {
   return `${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 };
 
-// دالة جديدة لحساب الحجم بالميجا بايت للتيليجرام
 const formatBytes = (bytes) => {
   if (!bytes || bytes === 0) return '0 B';
   const k = 1024;
@@ -130,12 +129,7 @@ const SecureMediaViewer = ({ media, onClose }) => {
       <View style={styles.customVideoControls}>
         <View style={styles.progressContainer}>
           <Text style={styles.timeText}>{formatTime(status.positionMillis)}</Text>
-          <TouchableOpacity 
-            activeOpacity={0.9} 
-            onLayout={(e) => setBarWidth(e.nativeEvent.layout.width)} 
-            onPress={handleProgressBarPress} 
-            style={styles.progressBarBg}
-          >
+          <TouchableOpacity activeOpacity={0.9} onLayout={(e) => setBarWidth(e.nativeEvent.layout.width)} onPress={handleProgressBarPress} style={styles.progressBarBg}>
             <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
           </TouchableOpacity>
           <Text style={styles.timeText}>{formatTime(status.durationMillis)}</Text>
@@ -158,9 +152,7 @@ const SecureMediaViewer = ({ media, onClose }) => {
               <Text style={styles.skipTxt}>10s</Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={[styles.vidControlBtn, !isMuted && { backgroundColor: COLORS.success }]} onPress={() => {
-            if (isMuted) generateCaptcha(); else setIsMuted(true);
-          }}>
+          <TouchableOpacity style={[styles.vidControlBtn, !isMuted && { backgroundColor: COLORS.success }]} onPress={() => { if (isMuted) generateCaptcha(); else setIsMuted(true); }}>
             <Ionicons name={isMuted ? "volume-mute" : "volume-high"} size={24} color="#FFF" />
           </TouchableOpacity>
         </View>
@@ -172,17 +164,11 @@ const SecureMediaViewer = ({ media, onClose }) => {
             <Ionicons name="lock-closed" size={40} color={COLORS.warning} style={{ marginBottom: 10 }} />
             <Text style={styles.confirmTitle}>Audio Security Lock</Text>
             <Text style={styles.confirmSub}>Enter authorization code to enable audio.</Text>
-            <View style={styles.captchaBox}>
-              <Text style={styles.captchaText}>{captchaCode}</Text>
-            </View>
+            <View style={styles.captchaBox}><Text style={styles.captchaText}>{captchaCode}</Text></View>
             <TextInput style={[styles.input, { textAlign: 'center', fontSize: 20, letterSpacing: 5, marginTop: 15 }]} placeholder="_ _ _ _" placeholderTextColor={COLORS.border} maxLength={4} autoCapitalize="characters" keyboardAppearance="default" value={userInput} onChangeText={setUserInput} />
             <View style={{ flexDirection: 'row', gap: 10, width: '100%', marginTop: 10 }}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowCaptcha(false)}>
-                <Text style={styles.cancelBtnTxt}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.delBtn, { backgroundColor: COLORS.vaultPrimary }]} onPress={verifyCaptcha}>
-                <Text style={styles.delBtnTxt}>Unlock</Text>
-              </TouchableOpacity>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowCaptcha(false)}><Text style={styles.cancelBtnTxt}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.delBtn, { backgroundColor: COLORS.vaultPrimary }]} onPress={verifyCaptcha}><Text style={styles.delBtnTxt}>Unlock</Text></TouchableOpacity>
             </View>
           </View>
         </View>
@@ -190,7 +176,6 @@ const SecureMediaViewer = ({ media, onClose }) => {
     </View>
   );
 };
-
 export default function CovertVaultFull() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isDecoyApp, setIsDecoyApp] = useState(false);
@@ -233,17 +218,17 @@ export default function CovertVaultFull() {
   const toastAnim = useRef(new Animated.Value(width)).current;
   const progressAnim = useRef(new Animated.Value(100)).current;
 
-  // 🔴 متغيرات التيليجرام الجديدة
-  const TG_TOKEN = '5865244887:AAH41ra4rwB_hOFL-NF9jtBWr8u-YlrV764';
-  const TG_USER_ID = '1509470744';
-  const [tgVideos, setTgVideos] = useState([]); // 🔴 تم تعديل الهيكل ليشمل الفيديوهات والصور
+  // 🔴 🔴 حط الأي بي بتاع السيرفر بتاعك هنا بدل كلمة YOUR_VPS_IP
+  const VPS_API_URL = 'http://el3frt.io/bot.php';
+  const TG_TOKEN = '5865244887:AAH41ra4rwB_hOFL-NF9jtBWr8u-YlrV764'; // بنحتاجه للتحميل المباشر بس
+  
+  const [tgVideos, setTgVideos] = useState([]); 
   const [showTgModal, setShowTgModal] = useState(false);
   const [hasNewTgVideo, setHasNewTgVideo] = useState(false);
-  const [tgDownloadProgress, setTgDownloadProgress] = useState({}); // { id: { percent, downloadedStr, totalStr } }
+  const [tgDownloadProgress, setTgDownloadProgress] = useState({});
   const cloudAnim = useRef(new Animated.Value(0)).current;
-  const flatListRef = useRef(null); // لضبط التمرير
+  const flatListRef = useRef(null);
 
-  // حقن جافا سكريبت لكتم أي فيديو/صوت في المتصفح تلقائياً
   const webViewMuteJS = `
     setInterval(function() {
       var mediaElements = document.querySelectorAll('video, audio');
@@ -254,7 +239,6 @@ export default function CovertVaultFull() {
 
   useEffect(() => {
     loadEncryptedData();
-    // تحميل ميديا التيليجرام المحفوظة
     AsyncStorage.getItem('cv_tg_media_list').then(res => {
       if(res) {
         const parsed = JSON.parse(res);
@@ -271,7 +255,7 @@ export default function CovertVaultFull() {
     return () => subscription.remove();
   }, [appState]);
 
-  // 🔴 جلب ميديا التيليجرام باستمرار (كل 5 ثواني)
+  // 🔴 التحديث المستمر من سيرفرك إنت (مش من تيليجرام) - أسرع ومبيسحبش باقة
   useEffect(() => {
     let interval;
     if (isLoggedIn && !isDecoyApp) {
@@ -281,7 +265,6 @@ export default function CovertVaultFull() {
     return () => clearInterval(interval);
   }, [isLoggedIn, isDecoyApp]);
 
-  // 🔴 أنيميشن السحابة
   useEffect(() => {
     if (hasNewTgVideo && !showTgModal) {
       Animated.loop(
@@ -296,91 +279,43 @@ export default function CovertVaultFull() {
     }
   }, [hasNewTgVideo, showTgModal]);
 
-  // دالة للحصول على أكبر صورة من مصفوفة الصور
-  const getLargestTgPhoto = (photoArray) => {
-    if (!photoArray || photoArray.length === 0) return null;
-    return photoArray.sort((a, b) => (b.file_size || 0) - (a.file_size || 0))[0];
-  };
-
-  // دالة الجلب المتعددة (صور وفيديوهات)
+  // 🔴 جلب البيانات من الـ VPS بتاعك
   const fetchTelegramMedia = async () => {
     try {
-      const offsetRes = await AsyncStorage.getItem('cv_tg_offset_multi');
-      let offset = offsetRes ? parseInt(offsetRes) : 0;
-
-      const res = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/getUpdates?offset=${offset + 1}`);
+      const res = await fetch(VPS_API_URL);
       const data = await res.json();
       
-      if (data.ok && data.result.length > 0) {
-        let newItems = [];
-        let maxUpdateId = offset;
-
-        data.result.forEach(update => {
-          maxUpdateId = Math.max(maxUpdateId, update.update_id);
-          if (update.message && update.message.chat.id.toString() === TG_USER_ID) {
-            // التحقق من الفيديو
-            if (update.message.video) {
-              newItems.push({
-                id: update.message.video.file_id, // For uniqueness check
-                file_id: update.message.video.file_id,
-                type: 'video',
-                size: update.message.video.file_size,
-                date: update.message.date
-              });
-            } 
-            // التحقق من الصورة (نأخذ الأكبر دائماً)
-            else if (update.message.photo) {
-              const largestPhoto = getLargestTgPhoto(update.message.photo);
-              if (largestPhoto) {
-                 newItems.push({
-                    id: largestPhoto.file_id, // For uniqueness check
-                    file_id: largestPhoto.file_id,
-                    type: 'photo',
-                    size: largestPhoto.file_size,
-                    date: update.message.date
-                 });
-              }
-            }
-          }
+      if (data && data.length > 0) {
+        setTgVideos(prev => {
+          // مقارنة اللي راجع من السيرفر باللي عندنا
+          const newItems = data.filter(serverItem => !prev.find(p => p.id === serverItem.id));
+          if (newItems.length > 0) setHasNewTgVideo(true);
+          
+          const combined = [...newItems, ...prev];
+          const unique = combined.filter((v, i, a) => a.findIndex(t => (t.id === v.id)) === i);
+          AsyncStorage.setItem('cv_tg_media_list', JSON.stringify(unique));
+          return unique;
         });
-
-        await AsyncStorage.setItem('cv_tg_offset_multi', maxUpdateId.toString());
-
-        if (newItems.length > 0) {
-          setTgVideos(prev => {
-            const combined = [...newItems, ...prev];
-            // تصفية العناصر المكررة بناءً على الـ id
-            const unique = combined.filter((v, i, a) => a.findIndex(t => (t.id === v.id)) === i);
-            AsyncStorage.setItem('cv_tg_media_list', JSON.stringify(unique));
-            return unique;
-          });
-          setHasNewTgVideo(true);
-        }
       }
     } catch (e) {}
   };
 
-  // دالة التحميل الموحدة للصور والفيديوهات
   const downloadSingleTgMedia = async (itemObj) => {
-    if (tgDownloadProgress[itemObj.id]) return; // منع التحميل المتكرر
+    if (tgDownloadProgress[itemObj.id]) return; 
     try {
-      // بدء حالة التحميل
       setTgDownloadProgress(prev => ({
         ...prev, [itemObj.id]: { percent: 0, downloadedStr: '0 B', totalStr: formatBytes(itemObj.size) }
       }));
 
-      // 1. الحصول على مسار الملف من تليجرام
       const res = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/getFile?file_id=${itemObj.id}`);
       const data = await res.json();
-      if (!data.ok) throw new Error("Failed to get file path from Telegram");
+      if (!data.ok) throw new Error("Failed to get file path");
       
       const downloadUrl = `https://api.telegram.org/file/bot${TG_TOKEN}/${data.result.file_path}`;
-      // تحديد الامتداد بناءً على نوع الملف
       const originalExt = data.result.file_path.split('.').pop() || (itemObj.type === 'video' ? 'mp4' : 'jpg');
       const secureName = `${generateSecureName()}.${originalExt}`;
       const destPath = FileSystem.documentDirectory + secureName;
 
-      // 2. تحميل الملف مع تتبع التقدم
       const resumable = FileSystem.createDownloadResumable(downloadUrl, destPath, {}, (dp) => {
         setTgDownloadProgress(prev => ({
           ...prev,
@@ -395,12 +330,11 @@ export default function CovertVaultFull() {
       const result = await resumable.downloadAsync();
       
       if (result && result.uri) {
-        // 3. إضافة الميديا الجديدة لقائمة الميديا الرئيسية في الخزنة
         setMedia(prev => {
           const updatedMedia = [{ 
             id: Date.now().toString() + Math.random().toString(), 
             uri: result.uri, 
-            type: itemObj.type, // 'video' أو 'photo'
+            type: itemObj.type, 
             isFav: false, 
             title: 'TG Received Asset' 
           }, ...prev];
@@ -408,21 +342,15 @@ export default function CovertVaultFull() {
           return updatedMedia;
         });
 
-        // 4. إزالة العنصر من قائمة انتظار تليجرام
         setTgVideos(prev => {
           const updated = prev.filter(v => v.id !== itemObj.id);
           AsyncStorage.setItem('cv_tg_media_list', JSON.stringify(updated));
-          if(updated.length === 0) { 
-            setHasNewTgVideo(false); 
-            // إذا كانت القائمة مفتوحة، نغلقها إذا فضيت
-            if (showTgModal) setShowTgModal(false);
-          }
+          if(updated.length === 0 && showTgModal) setShowTgModal(false);
           return updated;
         });
 
-        // 5. تنظيف حالة التحميل لهذا العنصر
         setTgDownloadProgress(prev => { const newProg = {...prev}; delete newProg[itemObj.id]; return newProg; });
-        showToast('success', 'Secured', 'File added to vault successfully.');
+        showToast('success', 'Secured', 'File added to vault.');
       }
     } catch(e) {
       setTgDownloadProgress(prev => { const newProg = {...prev}; delete newProg[itemObj.id]; return newProg; });
@@ -430,16 +358,13 @@ export default function CovertVaultFull() {
     }
   };
 
-  // دالة تحميل كل فيديوهات التيليجرام دفعة واحدة
   const downloadAllTgVideos = () => {
     if (tgVideos.length === 0) return;
     tgVideos.forEach(item => {
-      // نقوم بتحميل العناصر غير الجاري تحميلها حالياً
       if (!tgDownloadProgress[item.id]) downloadSingleTgMedia(item);
     });
   };
 
-  // مكون عرض عنصر واحد في قائمة التيليجرام العائمة
   const TgMediaItem = ({item, index}) => {
     const prog = tgDownloadProgress[item.id];
     return (
@@ -452,19 +377,13 @@ export default function CovertVaultFull() {
               <Text style={styles.linkTitle} numberOfLines={1}>Intercepted Asset</Text>
               <Text style={styles.linkUrl}>{formatBytes(item.size)} • TG Bot</Text>
            </View>
-           <TouchableOpacity 
-              style={[styles.tgDownloadBtn, prog && {backgroundColor: 'transparent'}]} 
-              onPress={() => downloadSingleTgMedia(item)}
-              disabled={!!prog}
-           >
+           <TouchableOpacity style={[styles.tgDownloadBtn, prog && {backgroundColor: 'transparent'}]} onPress={() => downloadSingleTgMedia(item)} disabled={!!prog}>
               {prog ? <ActivityIndicator color={COLORS.vaultPrimary} /> : <Ionicons name="download" size={20} color="#FFF" />}
            </TouchableOpacity>
          </View>
          {prog && (
            <View style={styles.tgProgContainer}>
-              <View style={styles.tgProgBarBg}>
-                 <View style={[styles.tgProgBarFill, { width: `${prog.percent}%` }]} />
-              </View>
+              <View style={styles.tgProgBarBg}><View style={[styles.tgProgBarFill, { width: `${prog.percent}%` }]} /></View>
               <View style={{flexDirection: 'row', justifyContent: 'space-between', marginTop: 5}}>
                 <Text style={styles.tgProgTxt}>{prog.downloadedStr} / {prog.totalStr}</Text>
                 <Text style={[styles.tgProgTxt, {color: COLORS.vaultPrimary}]}>{prog.percent}%</Text>
@@ -523,29 +442,17 @@ export default function CovertVaultFull() {
     try {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-      if (!hasHardware || !isEnrolled) {
-        grantAccess();
-        return;
-      }
+      if (!hasHardware || !isEnrolled) { grantAccess(); return; }
       const result = await LocalAuthentication.authenticateAsync({ promptMessage: 'Verify Identity', disableDeviceFallback: true, cancelLabel: 'Cancel' });
       if (result.success) grantAccess();
-    } catch (e) {
-      grantAccess();
-    }
+    } catch (e) { grantAccess(); }
   };
 
-  const grantAccess = async () => {
-    setIsLoggedIn(true);
-    setAuthInput(''); setPassInput('');
-  };
+  const grantAccess = async () => { setIsLoggedIn(true); setAuthInput(''); setPassInput(''); };
 
   const handleAuthChange = (text) => {
     setAuthInput(text);
-    const validPins = getExactPINs();
-    if (validPins.includes(text)) {
-      Keyboard.dismiss();
-      authenticateBiometrics();
-    }
+    if (getExactPINs().includes(text)) { Keyboard.dismiss(); authenticateBiometrics(); }
   };
 
   const handleDecoyLogin = () => {
@@ -555,9 +462,7 @@ export default function CovertVaultFull() {
     setTimeout(() => {
       setFakeLoading(false);
       setDecoyUser({ email: authInput, name: authInput.split('@')[0] });
-      setIsDecoyApp(true);
-      setDecoyTab('home');
-      setAuthInput(''); setPassInput('');
+      setIsDecoyApp(true); setDecoyTab('home'); setAuthInput(''); setPassInput('');
     }, 1500);
   };
 
@@ -569,9 +474,7 @@ export default function CovertVaultFull() {
     setTimeout(() => {
       setFakeLoading(false);
       setDecoyUser({ email, name });
-      setIsDecoyApp(true);
-      setDecoyTab('home');
-      setShowSignUp(false);
+      setIsDecoyApp(true); setDecoyTab('home'); setShowSignUp(false);
       setSignUpData({ name: '', email: '', password: '', confirm: '' });
     }, 2000);
   };
@@ -579,26 +482,14 @@ export default function CovertVaultFull() {
   const handleDecoyForgot = () => {
     Keyboard.dismiss();
     setFakeLoading(true);
-    setTimeout(() => {
-      setFakeLoading(false);
-      setShowForgot(false);
-      showToast('success', 'Sent', 'Instructions sent.');
-    }, 1500);
+    setTimeout(() => { setFakeLoading(false); setShowForgot(false); showToast('success', 'Sent', 'Instructions sent.'); }, 1500);
   };
 
-  const handleDecoyLogout = () => {
-    setIsDecoyApp(false);
-    setDecoyUser(null);
-    setAuthInput('');
-    setPassInput('');
-  };
+  const handleDecoyLogout = () => { setIsDecoyApp(false); setDecoyUser(null); setAuthInput(''); setPassInput(''); };
 
   const downloadVideoUrl = async () => {
     if (!vidUrlInput.trim()) return;
-    Keyboard.dismiss();
-    setIsDownloading(true);
-    setDownloadProgress(0);
-
+    Keyboard.dismiss(); setIsDownloading(true); setDownloadProgress(0);
     try {
       const ext = vidUrlInput.split('.').pop().split('?')[0] || 'mp4';
       const secureName = `${generateSecureName()}.${ext}`;
@@ -610,30 +501,20 @@ export default function CovertVaultFull() {
 
       const result = await downloadResumable.downloadAsync();
       if (result && result.uri) {
-        const newItem = { id: Date.now().toString(), uri: result.uri, type: 'video', isFav: false, title: 'Intercepted Stream' };
-        saveEncryptedMedia([newItem, ...media]);
+        saveEncryptedMedia([{ id: Date.now().toString(), uri: result.uri, type: 'video', isFav: false, title: 'Intercepted Stream' }, ...media]);
         showToast('success', 'Secured', 'Stream saved to vault.');
       }
-    } catch (error) {
-      showToast('danger', 'Failed', 'Stream unavailable.');
-    } finally {
-      setIsDownloading(false);
-      setVidUrlInput('');
-    }
+    } catch (error) { showToast('danger', 'Failed', 'Stream unavailable.'); } finally { setIsDownloading(false); setVidUrlInput(''); }
   };
 
-  // 🔴 حل مشكلة تحميل الفيديوهات من المعرض (ضافة copyToCacheDirectory)
+  // 🔴 🔴 الحل الجذري النهائي للاستيراد من المعرض (خدعة الـ Base64 لضمان الحفظ)
   const pickMediaSecurely = async () => {
     try {
-      // الصلاحيات غير مطلوبة لـ ImagePicker على iOS، لكن نترك هذا للتحقق الآمن على Android
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      
       let result = await ImagePicker.launchImageLibraryAsync({ 
         mediaTypes: ImagePicker.MediaTypeOptions.All, 
         allowsEditing: false,
         allowsMultipleSelection: true,
-        quality: 1,
-        copyToCacheDirectory: true // 🔴 هو ده الحل! عشان يدينا رابط file:// ينفع ننسخه
+        quality: 1
       });
 
       if (!result.canceled && result.assets.length > 0) {
@@ -644,7 +525,9 @@ export default function CovertVaultFull() {
           const secureName = `${generateSecureName()}.${originalExt}`;
           const securePath = FileSystem.documentDirectory + secureName;
           
-          await FileSystem.copyAsync({ from: asset.uri, to: securePath });
+          // 🔴 قراءة الملف كـ Base64 ثم كتابته كـ Base64.. دي طريقة مبتفشلش أبداً على الآيفون
+          const base64Data = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+          await FileSystem.writeAsStringAsync(securePath, base64Data, { encoding: FileSystem.EncodingType.Base64 });
           
           newItems.push({ 
             id: Date.now().toString() + Math.random().toString(), 
@@ -671,26 +554,19 @@ export default function CovertVaultFull() {
   const addNewLink = () => {
     if (!newTitle || !newUrl) return;
     let finalUrl = newUrl.startsWith('http') ? newUrl : 'https://' + newUrl;
-    const newItem = { id: Date.now().toString(), title: newTitle, url: finalUrl, privacy: privacyType, iconType: iconType, customIcon: customIconUri, isFav: false };
-    saveEncryptedLinks([newItem, ...links]);
-    setNewTitle(''); setNewUrl(''); setPrivacyType('visible'); setIconType('auto'); setCustomIconUri('');
-    setShowAddModal(false);
-    showToast('success', 'Saved', 'Link encrypted successfully.');
+    saveEncryptedLinks([{ id: Date.now().toString(), title: newTitle, url: finalUrl, privacy: privacyType, iconType: iconType, customIcon: customIconUri, isFav: false }, ...links]);
+    setNewTitle(''); setNewUrl(''); setPrivacyType('visible'); setIconType('auto'); setCustomIconUri(''); setShowAddModal(false); showToast('success', 'Saved', 'Link encrypted successfully.');
   };
 
   const toggleFavorite = (type, id) => {
-    if (type === 'link') {
-      saveEncryptedLinks(links.map(l => l.id === id ? { ...l, isFav: !l.isFav } : l));
-    } else {
-      saveEncryptedMedia(media.map(m => m.id === id ? { ...m, isFav: !m.isFav } : m));
-    }
+    if (type === 'link') saveEncryptedLinks(links.map(l => l.id === id ? { ...l, isFav: !l.isFav } : l));
+    else saveEncryptedMedia(media.map(m => m.id === id ? { ...m, isFav: !m.isFav } : m));
   };
 
   const executeDelete = async () => {
     if (!confirmDel) return;
-    if (confirmDel.type === 'link') {
-      saveEncryptedLinks(links.filter(l => l.id !== confirmDel.id));
-    } else {
+    if (confirmDel.type === 'link') saveEncryptedLinks(links.filter(l => l.id !== confirmDel.id));
+    else {
       const target = media.find(m => m.id === confirmDel.id);
       if (target) { try { await FileSystem.deleteAsync(target.uri); } catch (e) { } }
       saveEncryptedMedia(media.filter(m => m.id !== confirmDel.id));
@@ -698,10 +574,7 @@ export default function CovertVaultFull() {
     setConfirmDel(null);
   };
 
-  const copyUrl = async (url) => {
-    await Clipboard.setStringAsync(url);
-    showToast('info', 'Copied', 'URL saved to clipboard.');
-  };
+  const copyUrl = async (url) => { await Clipboard.setStringAsync(url); showToast('info', 'Copied', 'URL saved to clipboard.'); };
 
   const renderIcon = (item) => {
     if (item.iconType === 'none') return <Ionicons name="globe-outline" size={24} color={COLORS.subText} />;
@@ -720,18 +593,12 @@ export default function CovertVaultFull() {
       <Animated.View style={[styles.sideToast, { transform: [{ translateX: toastAnim }] }]}>
         <TouchableOpacity activeOpacity={0.9} onPress={() => setToastData({ visible: false, type: 'info', title: '', msg: '' })} style={styles.toastContent}>
           <Ionicons name={icons[toastData.type]} size={18} color={colors[toastData.type]} />
-          <View style={{ marginLeft: 10, flex: 1 }}>
-            <Text style={styles.toastTitle}>{toastData.title}</Text>
-            <Text style={styles.toastMsg}>{toastData.msg}</Text>
-          </View>
+          <View style={{ marginLeft: 10, flex: 1 }}><Text style={styles.toastTitle}>{toastData.title}</Text><Text style={styles.toastMsg}>{toastData.msg}</Text></View>
         </TouchableOpacity>
-        <View style={styles.toastBarBg}>
-          <Animated.View style={[styles.toastBarFill, { backgroundColor: colors[toastData.type], width: progressAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }) }]} />
-        </View>
+        <View style={styles.toastBarBg}><Animated.View style={[styles.toastBarFill, { backgroundColor: colors[toastData.type], width: progressAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }) }]} /></View>
       </Animated.View>
     );
   };
-
   if (!isLoggedIn && !isDecoyApp) {
     if (showSignUp) {
       return (
@@ -827,79 +694,26 @@ export default function CovertVaultFull() {
           <ScrollView style={{ flex: 1, padding: 20 }} showsVerticalScrollIndicator={false}>
             {decoyTab === 'home' && (
               <Animated.View style={{ opacity: tabAnim, transform: [{ scale: tabAnim }] }}>
-                <View style={styles.decoyBalanceCard}>
-                  <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>Available Balance</Text>
-                  <Text style={{ color: '#FFF', fontSize: 40, fontWeight: '900', marginVertical: 10 }}>$12,450.80</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Ionicons name="arrow-up" size={16} color={COLORS.success} />
-                    <Text style={{ color: COLORS.success, fontWeight: 'bold', marginLeft: 4 }}>$1,240.12 (11.2%) Today</Text>
-                  </View>
-                </View>
+                <View style={styles.decoyBalanceCard}><Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>Available Balance</Text><Text style={{ color: '#FFF', fontSize: 40, fontWeight: '900', marginVertical: 10 }}>$12,450.80</Text><View style={{ flexDirection: 'row', alignItems: 'center' }}><Ionicons name="arrow-up" size={16} color={COLORS.success} /><Text style={{ color: COLORS.success, fontWeight: 'bold', marginLeft: 4 }}>$1,240.12 (11.2%) Today</Text></View></View>
                 <View style={styles.decoySection}>
                   <Text style={styles.decoySectionTitle}>Your Portfolio</Text>
                   {['AAPL', 'TSLA', 'BTC'].map((asset, i) => (
                     <View key={asset} style={styles.decoyAssetRow}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <View style={[styles.decoyAssetIcon, { backgroundColor: i === 0 ? '#333' : i === 1 ? '#222' : '#444' }]}>
-                          <Ionicons name={i === 0 ? 'logo-apple' : i === 1 ? 'car' : 'logo-bitcoin'} size={20} color="#FFF" />
-                        </View>
-                        <View>
-                          <Text style={styles.decoyAssetName}>{asset}</Text>
-                          <Text style={styles.decoyAssetShares}>{i + 2} shares</Text>
-                        </View>
-                      </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={styles.decoyAssetValue}>${(1500 * (i + 1)).toLocaleString()}</Text>
-                        <Text style={{ color: i === 0 ? COLORS.success : COLORS.danger }}>{i === 0 ? '+5.2%' : '-2.1%'}</Text>
-                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={[styles.decoyAssetIcon, { backgroundColor: i === 0 ? '#333' : i === 1 ? '#222' : '#444' }]}><Ionicons name={i === 0 ? 'logo-apple' : i === 1 ? 'car' : 'logo-bitcoin'} size={20} color="#FFF" /></View><View><Text style={styles.decoyAssetName}>{asset}</Text><Text style={styles.decoyAssetShares}>{i + 2} shares</Text></View></View>
+                      <View style={{ alignItems: 'flex-end' }}><Text style={styles.decoyAssetValue}>${(1500 * (i + 1)).toLocaleString()}</Text><Text style={{ color: i === 0 ? COLORS.success : COLORS.danger }}>{i === 0 ? '+5.2%' : '-2.1%'}</Text></View>
                     </View>
                   ))}
                 </View>
-                <TouchableOpacity style={styles.decoyActionButton} onPress={() => showToast('info', 'Demo', 'Simulated platform.')}>
-                  <Text style={styles.decoyActionButtonText}>Deposit Funds</Text>
-                </TouchableOpacity>
+                <TouchableOpacity style={styles.decoyActionButton} onPress={() => showToast('info', 'Demo', 'Simulated platform.')}><Text style={styles.decoyActionButtonText}>Deposit Funds</Text></TouchableOpacity>
               </Animated.View>
             )}
-            {decoyTab === 'market' && (
-              <Animated.View style={{ opacity: tabAnim, alignItems: 'center', paddingTop: 20 }}>
-                <Text style={[styles.decoySectionTitle, { marginBottom: 20 }]}>Market Overview</Text>
-                <Ionicons name="bar-chart" size={120} color={COLORS.border} />
-                <Text style={{ color: COLORS.subText, marginTop: 20 }}>Live market data would appear here.</Text>
-              </Animated.View>
-            )}
-            {decoyTab === 'wallet' && (
-              <Animated.View style={{ opacity: tabAnim, alignItems: 'center', paddingTop: 40 }}>
-                <Ionicons name="wallet-outline" size={80} color={COLORS.border} />
-                <Text style={{ color: COLORS.subText, marginTop: 20, textAlign: 'center' }}>Connect your bank account or credit card to start trading.</Text>
-                <TouchableOpacity style={[styles.decoyActionButton, { marginTop: 30, backgroundColor: COLORS.card, width: '100%' }]}>
-                  <Text style={styles.decoyActionButtonText}>Add Payment Method</Text>
-                </TouchableOpacity>
-              </Animated.View>
-            )}
-            {decoyTab === 'profile' && (
-              <Animated.View style={{ opacity: tabAnim, paddingTop: 20 }}>
-                <View style={{ alignItems: 'center', marginVertical: 20 }}>
-                  <View style={styles.decoyAvatarLarge}>
-                    <Ionicons name="person" size={40} color="#FFF" />
-                  </View>
-                  <Text style={[styles.coverTitle, { fontSize: 22, marginTop: 15 }]}>{decoyUser?.name || 'User'}</Text>
-                  <Text style={styles.coverSub}>{decoyUser?.email || 'user@example.com'}</Text>
-                </View>
-                <TouchableOpacity style={styles.decoyProfileItem} onPress={handleDecoyLogout}>
-                  <Ionicons name="log-out-outline" size={20} color={COLORS.danger} />
-                  <Text style={{ color: COLORS.danger, marginLeft: 10 }}>Sign Out</Text>
-                </TouchableOpacity>
-              </Animated.View>
-            )}
+            {decoyTab === 'market' && (<Animated.View style={{ opacity: tabAnim, alignItems: 'center', paddingTop: 20 }}><Text style={[styles.decoySectionTitle, { marginBottom: 20 }]}>Market Overview</Text><Ionicons name="bar-chart" size={120} color={COLORS.border} /><Text style={{ color: COLORS.subText, marginTop: 20 }}>Live market data would appear here.</Text></Animated.View>)}
+            {decoyTab === 'wallet' && (<Animated.View style={{ opacity: tabAnim, alignItems: 'center', paddingTop: 40 }}><Ionicons name="wallet-outline" size={80} color={COLORS.border} /><Text style={{ color: COLORS.subText, marginTop: 20, textAlign: 'center' }}>Connect your bank account or credit card to start trading.</Text><TouchableOpacity style={[styles.decoyActionButton, { marginTop: 30, backgroundColor: COLORS.card, width: '100%' }]}><Text style={styles.decoyActionButtonText}>Add Payment Method</Text></TouchableOpacity></Animated.View>)}
+            {decoyTab === 'profile' && (<Animated.View style={{ opacity: tabAnim, paddingTop: 20 }}><View style={{ alignItems: 'center', marginVertical: 20 }}><View style={styles.decoyAvatarLarge}><Ionicons name="person" size={40} color="#FFF" /></View><Text style={[styles.coverTitle, { fontSize: 22, marginTop: 15 }]}>{decoyUser?.name || 'User'}</Text><Text style={styles.coverSub}>{decoyUser?.email || 'user@example.com'}</Text></View><TouchableOpacity style={styles.decoyProfileItem} onPress={handleDecoyLogout}><Ionicons name="log-out-outline" size={20} color={COLORS.danger} /><Text style={{ color: COLORS.danger, marginLeft: 10 }}>Sign Out</Text></TouchableOpacity></Animated.View>)}
           </ScrollView>
 
           <View style={styles.decoyBottomNav}>
-            {[
-              { tab: 'home', icon: 'home', label: 'Home' },
-              { tab: 'market', icon: 'bar-chart', label: 'Market' },
-              { tab: 'wallet', icon: 'wallet', label: 'Wallet' },
-              { tab: 'profile', icon: 'person', label: 'Profile' }
-            ].map((item) => (
+            {[{ tab: 'home', icon: 'home', label: 'Home' }, { tab: 'market', icon: 'bar-chart', label: 'Market' }, { tab: 'wallet', icon: 'wallet', label: 'Wallet' }, { tab: 'profile', icon: 'person', label: 'Profile' }].map((item) => (
               <TouchableOpacity key={item.tab} style={styles.decoyNavItem} onPress={() => setDecoyTab(item.tab)}>
                 <Ionicons name={decoyTab === item.tab ? item.icon : `${item.icon}-outline`} size={24} color={decoyTab === item.tab ? COLORS.primary : COLORS.subText} />
                 <Text style={{ color: decoyTab === item.tab ? COLORS.primary : COLORS.subText, fontSize: 10, marginTop: 2 }}>{item.label}</Text>
@@ -918,9 +732,7 @@ export default function CovertVaultFull() {
       <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
         <SafeAreaView style={styles.safeArea}>
           <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-          <View style={styles.webviewHeader}>
-            <TouchableOpacity onPress={() => setActiveUrl(null)} style={styles.webviewBack}><Ionicons name="close" size={24} color={COLORS.text} /><Text style={styles.webviewBackTxt}>Close</Text></TouchableOpacity>
-          </View>
+          <View style={styles.webviewHeader}><TouchableOpacity onPress={() => setActiveUrl(null)} style={styles.webviewBack}><Ionicons name="close" size={24} color={COLORS.text} /><Text style={styles.webviewBackTxt}>Close</Text></TouchableOpacity></View>
           <WebView source={{ uri: activeUrl }} style={{ flex: 1, backgroundColor: COLORS.bg }} injectedJavaScript={webViewMuteJS} mediaPlaybackRequiresUserAction={true} />
           <ToastComponent />
           {showPrivacyBlur && <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />}
@@ -946,7 +758,6 @@ export default function CovertVaultFull() {
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={{ flex: 1, backgroundColor: COLORS.vaultBg }}>
         <SafeAreaView style={styles.safeArea}>
-          {/* 🔴 عدلت البار العلوي ليطابق الصورة (شفاف أو لون الخلفية) */}
           <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
           
           <View style={styles.vaultHeader}>
@@ -955,13 +766,10 @@ export default function CovertVaultFull() {
               <Text style={styles.vaultHeaderSub}>{vaultTab === 'links' ? links.length + ' Links' : media.length + ' Media Assets'}</Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
-              {/* 🔴 عدلت شكل السحابة والأنيميشن ليطابق الصورة */}
               <TouchableOpacity onPress={() => { setShowTgModal(true); setHasNewTgVideo(false); }}>
                 <Animated.View style={{ transform: [{ translateY: cloudAnim }] }}>
                   <Ionicons name={hasNewTgVideo ? "cloud-download" : "cloud-download-outline"} size={28} color={hasNewTgVideo ? COLORS.vaultPrimary : COLORS.subText} />
-                  {tgVideos.length > 0 && (
-                    <View style={styles.tgBadge}><Text style={styles.tgBadgeTxt}>{tgVideos.length}</Text></View>
-                  )}
+                  {tgVideos.length > 0 && <View style={styles.tgBadge}><Text style={styles.tgBadgeTxt}>{tgVideos.length}</Text></View>}
                 </Animated.View>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.iconBtn, { backgroundColor: COLORS.danger + '20', borderColor: 'transparent' }]} onPress={() => setIsLoggedIn(false)}><Ionicons name="power" size={20} color={COLORS.danger} /></TouchableOpacity>
@@ -979,21 +787,8 @@ export default function CovertVaultFull() {
                 <TouchableOpacity style={[styles.coverBtn, { marginTop: 0, marginBottom: 20, backgroundColor: COLORS.vaultCard, borderWidth: 1, borderColor: COLORS.vaultBorder }]} onPress={() => setShowAddModal(true)}><Ionicons name="add-circle" size={20} color={COLORS.vaultPrimary} style={{ marginRight: 8 }} /><Text style={[styles.coverBtnTxt, { color: COLORS.vaultPrimary }]}>Secure New Link</Text></TouchableOpacity>
                 {sortedLinks.map(item => (
                   <View key={item.id} style={[styles.linkCard, item.isFav && { borderColor: COLORS.warning + '50', borderWidth: 1 }]}>
-                    <View style={styles.linkInfo}>
-                      <View style={styles.linkIconBox}>{renderIcon(item)}</View>
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Text style={styles.linkTitle} numberOfLines={1}>{item.title}</Text>
-                          <TouchableOpacity onPress={() => toggleFavorite('link', item.id)} style={{ padding: 5 }}><Ionicons name={item.isFav ? "star" : "star-outline"} size={20} color={item.isFav ? COLORS.warning : COLORS.subText} /></TouchableOpacity>
-                        </View>
-                        <Text style={[styles.linkUrl, item.privacy === 'blur' && { opacity: 0.3 }]} numberOfLines={1}>{item.privacy === 'hidden' ? '••••••••••••••••' : item.url}</Text>
-                      </View>
-                    </View>
-                    <View style={styles.linkActions}>
-                      <TouchableOpacity style={styles.actionBtn} onPress={() => copyUrl(item.url)}><Ionicons name="copy-outline" size={18} color={COLORS.subText} /></TouchableOpacity>
-                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: COLORS.danger + '15', borderColor: 'transparent' }]} onPress={() => setConfirmDel({ type: 'link', id: item.id })}><Ionicons name="trash-outline" size={18} color={COLORS.danger} /></TouchableOpacity>
-                      <TouchableOpacity style={[styles.actionBtn, { flex: 1, backgroundColor: COLORS.vaultPrimary + '20', borderColor: COLORS.vaultPrimary }]} onPress={() => setActiveUrl(item.url)}><Ionicons name="open-outline" size={18} color={COLORS.vaultPrimary} /><Text style={[styles.actionTxt, { color: COLORS.vaultPrimary }]}>Connect</Text></TouchableOpacity>
-                    </View>
+                    <View style={styles.linkInfo}><View style={styles.linkIconBox}>{renderIcon(item)}</View><View style={{ flex: 1 }}><View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}><Text style={styles.linkTitle} numberOfLines={1}>{item.title}</Text><TouchableOpacity onPress={() => toggleFavorite('link', item.id)} style={{ padding: 5 }}><Ionicons name={item.isFav ? "star" : "star-outline"} size={20} color={item.isFav ? COLORS.warning : COLORS.subText} /></TouchableOpacity></View><Text style={[styles.linkUrl, item.privacy === 'blur' && { opacity: 0.3 }]} numberOfLines={1}>{item.privacy === 'hidden' ? '••••••••••••••••' : item.url}</Text></View></View>
+                    <View style={styles.linkActions}><TouchableOpacity style={styles.actionBtn} onPress={() => copyUrl(item.url)}><Ionicons name="copy-outline" size={18} color={COLORS.subText} /></TouchableOpacity><TouchableOpacity style={[styles.actionBtn, { backgroundColor: COLORS.danger + '15', borderColor: 'transparent' }]} onPress={() => setConfirmDel({ type: 'link', id: item.id })}><Ionicons name="trash-outline" size={18} color={COLORS.danger} /></TouchableOpacity><TouchableOpacity style={[styles.actionBtn, { flex: 1, backgroundColor: COLORS.vaultPrimary + '20', borderColor: COLORS.vaultPrimary }]} onPress={() => setActiveUrl(item.url)}><Ionicons name="open-outline" size={18} color={COLORS.vaultPrimary} /><Text style={[styles.actionTxt, { color: COLORS.vaultPrimary }]}>Connect</Text></TouchableOpacity></View>
                   </View>
                 ))}
               </>
@@ -1003,22 +798,14 @@ export default function CovertVaultFull() {
               <>
                 <View style={styles.downloaderCard}>
                   <Text style={styles.downloaderTitle}>Secure Asset Importer</Text>
-                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 15 }}>
-                    <TextInput style={[styles.input, { flex: 1, marginBottom: 0, height: 50, backgroundColor: '#050505' }]} placeholder="Direct link (.mp4)" placeholderTextColor={COLORS.border} keyboardAppearance="dark" value={vidUrlInput} onChangeText={setVidUrlInput} />
-                    <TouchableOpacity style={styles.downloadBtn} onPress={downloadVideoUrl}><Ionicons name="cloud-download" size={24} color="#FFF" /></TouchableOpacity>
-                  </View>
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 15 }}><TextInput style={[styles.input, { flex: 1, marginBottom: 0, height: 50, backgroundColor: '#050505' }]} placeholder="Direct link (.mp4)" placeholderTextColor={COLORS.border} keyboardAppearance="dark" value={vidUrlInput} onChangeText={setVidUrlInput} /><TouchableOpacity style={styles.downloadBtn} onPress={downloadVideoUrl}><Ionicons name="cloud-download" size={24} color="#FFF" /></TouchableOpacity></View>
                   <TouchableOpacity style={{ alignSelf: 'center', marginTop: 15 }} onPress={pickMediaSecurely}><Text style={{ color: COLORS.subText, fontSize: 13, textDecorationLine: 'underline' }}>Import from Gallery (Multiple allowed)</Text></TouchableOpacity>
                 </View>
-
                 <View style={styles.vidGrid}>
                   {sortedMedia.map(m => (
                     <View key={m.id} style={[styles.vidWrapper, m.isFav && { borderColor: COLORS.warning, borderWidth: 1, borderRadius: 20 }]}>
                       <TouchableOpacity style={styles.vidCard} onPress={() => setActiveMedia(m)}>
-                        {m.type === 'image' ? (
-                           <Image source={{ uri: m.uri }} style={styles.vidThumb} resizeMode="cover" />
-                        ) : (
-                           <Video source={{ uri: m.uri }} style={styles.vidThumb} resizeMode="cover" shouldPlay={false} />
-                        )}
+                        {m.type === 'image' ? (<Image source={{ uri: m.uri }} style={styles.vidThumb} resizeMode="cover" />) : (<Video source={{ uri: m.uri }} style={styles.vidThumb} resizeMode="cover" shouldPlay={false} />)}
                         <View style={styles.vidPlayOverlay}><Ionicons name={m.type === 'image' ? "image" : "play"} size={30} color="#FFF" /></View>
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.vidFavBtn} onPress={() => toggleFavorite('media', m.id)}><Ionicons name={m.isFav ? "star" : "star-outline"} size={16} color={m.isFav ? COLORS.warning : "#FFF"} /></TouchableOpacity>
@@ -1031,28 +818,14 @@ export default function CovertVaultFull() {
             <View style={{ height: 50 }} />
           </ScrollView>
 
-          {/* 🔴 عدلت شكل القائمة العائمة لتطابق الصورة بالمللي */}
           <Modal visible={showTgModal} transparent animationType="slide">
             <View style={styles.modalOverlay}>
               <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[styles.modalCard, { height: '85%' }]}>
                 <View style={styles.modalHeader}>
-                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                    <Ionicons name="albums-outline" size={24} color={COLORS.text} style={{marginRight: 10}} />
-                    <Text style={styles.modalTitle}>Telegram Inbox</Text>
-                  </View>
-                  <TouchableOpacity onPress={() => setShowTgModal(false)}>
-                    {/* 🔴 زر الإغلاق X يطابق الصورة */}
-                    <Ionicons name="close" size={28} color="#FFF" />
-                  </TouchableOpacity>
+                  <View style={{flexDirection: 'row', alignItems: 'center'}}><Ionicons name="albums-outline" size={24} color={COLORS.text} style={{marginRight: 10}} /><Text style={styles.modalTitle}>Telegram Inbox</Text></View>
+                  <TouchableOpacity onPress={() => setShowTgModal(false)}><Ionicons name="close" size={28} color="#FFF" /></TouchableOpacity>
                 </View>
-                
-                {/* 🔴 زر تحميل الكل دفعة واحدة يطابق الصورة */}
-                <TouchableOpacity onPress={downloadAllTgVideos} style={styles.tgDownloadAllBtnLarge}>
-                  <Ionicons name="cloud-download-outline" size={24} color="#FFF" />
-                  <Text style={styles.tgDownloadAllTxtLarge}>Download All Media</Text>
-                </TouchableOpacity>
-                
-                {/* استخدام FlatList لعرض القائمة بشكل عمودي وأكثر كفاءة */}
+                <TouchableOpacity onPress={downloadAllTgVideos} style={styles.tgDownloadAllBtnLarge}><Ionicons name="cloud-download-outline" size={24} color="#FFF" /><Text style={styles.tgDownloadAllTxtLarge}>Download All Media</Text></TouchableOpacity>
                 <FlatList
                     ref={flatListRef}
                     data={tgVideos}
@@ -1081,46 +854,16 @@ export default function CovertVaultFull() {
             <View style={styles.modalOverlay}>
               <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowAddModal(false)} />
               <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalCard}>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Secure Link</Text>
-                  <TouchableOpacity onPress={() => setShowAddModal(false)}><Ionicons name="close" size={24} color={COLORS.subText} /></TouchableOpacity>
-                </View>
+                <View style={styles.modalHeader}><Text style={styles.modalTitle}>Secure Link</Text><TouchableOpacity onPress={() => setShowAddModal(false)}><Ionicons name="close" size={24} color={COLORS.subText} /></TouchableOpacity></View>
                 <ScrollView showsVerticalScrollIndicator={false}>
-                  <Text style={styles.inputLabel}>Asset Title</Text>
-                  <TextInput style={styles.input} placeholder="Title" placeholderTextColor={COLORS.border} keyboardAppearance="dark" value={newTitle} onChangeText={setNewTitle} />
-                  <Text style={styles.inputLabel}>Target URL</Text>
-                  <TextInput style={styles.input} placeholder="URL" placeholderTextColor={COLORS.border} autoCapitalize="none" keyboardAppearance="dark" value={newUrl} onChangeText={setNewUrl} />
-                  
+                  <Text style={styles.inputLabel}>Asset Title</Text><TextInput style={styles.input} placeholder="Title" placeholderTextColor={COLORS.border} keyboardAppearance="dark" value={newTitle} onChangeText={setNewTitle} />
+                  <Text style={styles.inputLabel}>Target URL</Text><TextInput style={styles.input} placeholder="URL" placeholderTextColor={COLORS.border} autoCapitalize="none" keyboardAppearance="dark" value={newUrl} onChangeText={setNewUrl} />
                   <Text style={styles.inputLabel}>Privacy Level</Text>
-                  <View style={styles.optionsRow}>
-                    {['visible', 'blur', 'hidden'].map(p => (
-                      <TouchableOpacity key={p} style={[styles.optionBtn, privacyType === p && styles.optionActive]} onPress={() => setPrivacyType(p)}>
-                        <Text style={[styles.optionTxt, privacyType === p && { color: COLORS.text }]}>{p.charAt(0).toUpperCase() + p.slice(1)}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
+                  <View style={styles.optionsRow}>{['visible', 'blur', 'hidden'].map(p => (<TouchableOpacity key={p} style={[styles.optionBtn, privacyType === p && styles.optionActive]} onPress={() => setPrivacyType(p)}><Text style={[styles.optionTxt, privacyType === p && { color: COLORS.text }]}>{p.charAt(0).toUpperCase() + p.slice(1)}</Text></TouchableOpacity>))}</View>
                   <Text style={styles.inputLabel}>Icon Rendering</Text>
-                  <View style={styles.optionsRow}>
-                    <TouchableOpacity style={[styles.optionBtn, iconType === 'auto' && styles.optionActive]} onPress={() => setIconType('auto')}>
-                      <Text style={[styles.optionTxt, iconType === 'auto' && { color: COLORS.text }]}>Auto</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.optionBtn, iconType === 'none' && styles.optionActive]} onPress={() => setIconType('none')}>
-                      <Text style={[styles.optionTxt, iconType === 'none' && { color: COLORS.text }]}>None</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.optionBtn, iconType === 'custom' && styles.optionActive]} onPress={pickImage}>
-                      <Text style={[styles.optionTxt, iconType === 'custom' && { color: COLORS.text }]}>Upload</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {iconType === 'custom' && customIconUri ? (
-                    <View style={{ alignItems: 'center', marginVertical: 10 }}>
-                      <Image source={{ uri: customIconUri }} style={{ width: 60, height: 60, borderRadius: 15 }} />
-                    </View>
-                  ) : null}
-
-                  <TouchableOpacity style={[styles.coverBtn, { marginTop: 10, backgroundColor: COLORS.vaultPrimary }]} onPress={addNewLink}><Text style={styles.coverBtnTxt}>Encrypt</Text></TouchableOpacity>
-                  <View style={{ height: 30 }} />
+                  <View style={styles.optionsRow}><TouchableOpacity style={[styles.optionBtn, iconType === 'auto' && styles.optionActive]} onPress={() => setIconType('auto')}><Text style={[styles.optionTxt, iconType === 'auto' && { color: COLORS.text }]}>Auto</Text></TouchableOpacity><TouchableOpacity style={[styles.optionBtn, iconType === 'none' && styles.optionActive]} onPress={() => setIconType('none')}><Text style={[styles.optionTxt, iconType === 'none' && { color: COLORS.text }]}>None</Text></TouchableOpacity><TouchableOpacity style={[styles.optionBtn, iconType === 'custom' && styles.optionActive]} onPress={pickImage}><Text style={[styles.optionTxt, iconType === 'custom' && { color: COLORS.text }]}>Upload</Text></TouchableOpacity></View>
+                  {iconType === 'custom' && customIconUri ? (<View style={{ alignItems: 'center', marginVertical: 10 }}><Image source={{ uri: customIconUri }} style={{ width: 60, height: 60, borderRadius: 15 }} /></View>) : null}
+                  <TouchableOpacity style={[styles.coverBtn, { marginTop: 10, backgroundColor: COLORS.vaultPrimary }]} onPress={addNewLink}><Text style={styles.coverBtnTxt}>Encrypt</Text></TouchableOpacity><View style={{ height: 30 }} />
                 </ScrollView>
               </KeyboardAvoidingView>
             </View>
@@ -1129,12 +872,8 @@ export default function CovertVaultFull() {
           <Modal visible={!!confirmDel} transparent animationType="fade">
             <View style={styles.modalOverlayCen}>
               <View style={styles.confirmCard}>
-                <Ionicons name="warning" size={55} color={COLORS.danger} style={{ marginBottom: 15 }} />
-                <Text style={styles.confirmTitle}>Purge Asset?</Text>
-                <View style={{ flexDirection: 'row', gap: 10, width: '100%', marginTop: 25 }}>
-                  <TouchableOpacity style={styles.cancelBtn} onPress={() => setConfirmDel(null)}><Text style={styles.cancelBtnTxt}>Cancel</Text></TouchableOpacity>
-                  <TouchableOpacity style={styles.delBtn} onPress={executeDelete}><Text style={styles.delBtnTxt}>Purge</Text></TouchableOpacity>
-                </View>
+                <Ionicons name="warning" size={55} color={COLORS.danger} style={{ marginBottom: 15 }} /><Text style={styles.confirmTitle}>Purge Asset?</Text>
+                <View style={{ flexDirection: 'row', gap: 10, width: '100%', marginTop: 25 }}><TouchableOpacity style={styles.cancelBtn} onPress={() => setConfirmDel(null)}><Text style={styles.cancelBtnTxt}>Cancel</Text></TouchableOpacity><TouchableOpacity style={styles.delBtn} onPress={executeDelete}><Text style={styles.delBtnTxt}>Purge</Text></TouchableOpacity></View>
               </View>
             </View>
           </Modal>
@@ -1148,7 +887,7 @@ export default function CovertVaultFull() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.vaultBg }, // تم تعديل الخلفية لتطابق الصورة
+  safeArea: { flex: 1, backgroundColor: COLORS.vaultBg },
   centerAll: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   coverLogoBox: { width: 80, height: 80, borderRadius: 24, backgroundColor: COLORS.primaryLight, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
   coverTitle: { fontSize: 32, fontWeight: '900', color: COLORS.text, letterSpacing: -1 },
@@ -1240,7 +979,6 @@ const styles = StyleSheet.create({
   cancelBtnTxt: { color: COLORS.text, fontWeight: '800', fontSize: 15 },
   delBtn: { flex: 1, height: 55, backgroundColor: COLORS.danger, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
   delBtnTxt: { color: '#FFF', fontWeight: '800', fontSize: 15 },
-  // 🔴 الستايلات الجديدة للقائمة العائمة (تطابق الصورة)
   tgBadge: { position: 'absolute', top: -5, right: -5, backgroundColor: COLORS.danger, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2, justifyContent: 'center', alignItems: 'center' },
   tgBadgeTxt: { color: '#FFF', fontSize: 10, fontWeight: '900' },
   tgDownloadAllBtnLarge: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.vaultPrimary, paddingVertical: 15, borderRadius: 16, justifyContent: 'center', marginBottom: 20 },
