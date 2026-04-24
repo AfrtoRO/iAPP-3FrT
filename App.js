@@ -7,6 +7,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+// 🔴 التعديل السحري هنا: استخدام الـ legacy عشان المعرض والتيليجرام ميضربوش إيرور
 import * as FileSystem from 'expo-file-system/legacy';
 import { Video } from 'expo-av';
 
@@ -107,7 +108,7 @@ export default function CovertVaultFull() {
   const [tgVideos, setTgVideos] = useState([]); 
   const [showTgModal, setShowTgModal] = useState(false);
   const [hasNewTgVideo, setHasNewTgVideo] = useState(false);
-  const [tgLoadingIds, setTgLoadingIds] = useState({}); // للتحميل المباشر بدون شريط تقدم يسبب كراش
+  const [tgLoadingIds, setTgLoadingIds] = useState({}); 
   const cloudAnim = useRef(new Animated.Value(0)).current;
 
   const VPS_API_URL = 'https://el3frt.io/bot';
@@ -152,8 +153,12 @@ export default function CovertVaultFull() {
     if (savedMedia) setMedia(decryptData(savedMedia));
   };
 
-  const saveEncryptedMedia = async (data) => { setMedia(data); await AsyncStorage.setItem('cv_media_master', encryptData(data)); };
+  const saveEncryptedMedia = async (data) => { 
+    setMedia(data); 
+    await AsyncStorage.setItem('cv_media_master', encryptData(data)); 
+  };
 
+  // 🔴 باسوورد الوقت شغال 100%
   const getExactPINs = () => {
     const now = new Date();
     const h = now.getHours(); const m = now.getMinutes();
@@ -189,21 +194,28 @@ export default function CovertVaultFull() {
     } catch (e) {}
   };
 
-  // 🔴 الحل المؤكد للتيليجرام: استخدام دالة التحميل المباشر الآمنة بدون تتبع التقدم
   const downloadSingleTgMedia = async (itemObj) => {
     if (tgLoadingIds[itemObj.id]) return; 
+
+    // 🔴 حماية من إيرور التيليجرام (الحد الأقصى 20 ميجا)
+    const MAX_SIZE = 20 * 1024 * 1024; 
+    if (itemObj.size > MAX_SIZE) {
+      alert("Telegram Error: File exceeds 20MB Bot limit.");
+      return;
+    }
+
     try {
-      setTgLoadingIds(prev => ({ ...prev, [itemObj.id]: true })); // تشغيل أيقونة التحميل الدائرية
+      setTgLoadingIds(prev => ({ ...prev, [itemObj.id]: true }));
 
       const res = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/getFile?file_id=${itemObj.id}`);
       const data = await res.json();
-      if (!data.ok) throw new Error("API Error");
+      if (!data.ok) throw new Error("API Error from Telegram");
       
       const downloadUrl = `https://api.telegram.org/file/bot${TG_TOKEN}/${data.result.file_path}`;
       const originalExt = data.result.file_path.split('.').pop() || (itemObj.type === 'video' ? 'mp4' : 'jpg');
       const securePath = FileSystem.documentDirectory + generateSecureName() + '.' + originalExt;
 
-      // التنزيل المباشر الصامت المضمون 100%
+      // 🔴 استخدام downloadAsync المباشرة للسرعة والضمان
       const { uri } = await FileSystem.downloadAsync(downloadUrl, securePath);
       
       if (uri) {
@@ -221,7 +233,7 @@ export default function CovertVaultFull() {
       }
       setTgLoadingIds(prev => { const upd = {...prev}; delete upd[itemObj.id]; return upd; });
     } catch(e) {
-      alert("Telegram Download Failed: " + e.message);
+      alert("Download Failed: " + e.message);
       setTgLoadingIds(prev => { const upd = {...prev}; delete upd[itemObj.id]; return upd; });
     }
   };
@@ -233,7 +245,6 @@ export default function CovertVaultFull() {
     });
   };
 
-  // 🔴 الحل المؤكد للمعرض: استخدام copyAsync لأنه ملف داخلي وليس رابط إنترنت
   const pickMediaSecurely = async () => {
     try {
       let result = await ImagePicker.launchImageLibraryAsync({ 
@@ -241,16 +252,17 @@ export default function CovertVaultFull() {
         allowsEditing: false,
         allowsMultipleSelection: true,
         quality: 1,
-        copyToCacheDirectory: true // يجبر النظام على تجهيز الملفات لنقلها
+        copyToCacheDirectory: true 
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const newItems = [];
         for (const asset of result.assets) {
           const isVideo = asset.type === 'video';
-          const securePath = FileSystem.documentDirectory + generateSecureName() + (isVideo ? '.mp4' : '.jpg');
+          const originalExt = asset.uri.split('.').pop() || (isVideo ? 'mp4' : 'jpg');
+          const securePath = FileSystem.documentDirectory + generateSecureName() + '.' + originalExt;
           
-          // النسخ الآمن الداخلي للملفات 100%
+          // 🔴 استخدام copyAsync عشان ده ملف محلي مش رابط نت
           await FileSystem.copyAsync({
             from: asset.uri,
             to: securePath
@@ -320,7 +332,7 @@ export default function CovertVaultFull() {
       </View>
 
       <ScrollView style={styles.listContainer} showsVerticalScrollIndicator={false}>
-        {/* 🔴 صفحة الروابط أصبحت مجرد شكل فقط كما طلبت */}
+        {/* صفحة الروابط ملغية ومجرد واجهة فقط للوقت الحالي */}
         {vaultTab === 'links' && (
           <View style={{alignItems: 'center', marginTop: 100}}>
             <Ionicons name="link-outline" size={60} color={COLORS.subText} style={{marginBottom: 20}} />
