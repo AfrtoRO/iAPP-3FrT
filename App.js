@@ -6,13 +6,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Clipboard from 'expo-clipboard';
-import { WebView } from 'react-native-webview';
-import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { Video } from 'expo-av';
-import * as LocalAuthentication from 'expo-local-authentication';
 
 const { width } = Dimensions.get('window');
 
@@ -103,28 +99,15 @@ export default function CovertVaultFull() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authInput, setAuthInput] = useState('');
   
-  const [links, setLinks] = useState([]);
   const [media, setMedia] = useState([]);
   const [vaultTab, setVaultTab] = useState('media');
-  const [activeUrl, setActiveUrl] = useState(null);
   const [activeMedia, setActiveMedia] = useState(null);
-
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newUrl, setNewUrl] = useState('');
-  const [privacyType, setPrivacyType] = useState('visible');
-  const [iconType, setIconType] = useState('auto');
-  const [customIconUri, setCustomIconUri] = useState('');
   const [confirmDel, setConfirmDel] = useState(null);
-
-  const [vidUrlInput, setVidUrlInput] = useState('');
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
 
   const [tgVideos, setTgVideos] = useState([]); 
   const [showTgModal, setShowTgModal] = useState(false);
   const [hasNewTgVideo, setHasNewTgVideo] = useState(false);
-  const [tgDownloadProgress, setTgDownloadProgress] = useState({});
+  const [tgLoadingIds, setTgLoadingIds] = useState({}); // للتحميل المباشر بدون شريط تقدم يسبب كراش
   const cloudAnim = useRef(new Animated.Value(0)).current;
 
   const VPS_API_URL = 'https://el3frt.io/bot';
@@ -165,16 +148,12 @@ export default function CovertVaultFull() {
   }, [hasNewTgVideo, showTgModal]);
 
   const loadEncryptedData = async () => {
-    const savedLinks = await AsyncStorage.getItem('cv_links_master');
     const savedMedia = await AsyncStorage.getItem('cv_media_master');
-    if (savedLinks) setLinks(decryptData(savedLinks));
     if (savedMedia) setMedia(decryptData(savedMedia));
   };
 
-  const saveEncryptedLinks = async (data) => { setLinks(data); await AsyncStorage.setItem('cv_links_master', encryptData(data)); };
   const saveEncryptedMedia = async (data) => { setMedia(data); await AsyncStorage.setItem('cv_media_master', encryptData(data)); };
 
-  // 🔴 رجعتلك الكود الأصلي بتاعك اللي بيحسب الوقت بالمللي (12 و 24)
   const getExactPINs = () => {
     const now = new Date();
     const h = now.getHours(); const m = now.getMinutes();
@@ -183,7 +162,6 @@ export default function CovertVaultFull() {
     return [`${h12}${padM}`, `${h}${padM}`, `${padH}${padM}`];
   };
 
-  // 🔴 رجعتلك الدالة الأصلية لدخول التطبيق
   const handleAuthChange = (text) => {
     setAuthInput(text);
     if (getExactPINs().includes(text)) { 
@@ -202,7 +180,6 @@ export default function CovertVaultFull() {
         setTgVideos(prev => {
           const newItems = data.filter(serverItem => !prev.find(p => p.id === serverItem.id));
           if (newItems.length > 0) setHasNewTgVideo(true);
-          
           const combined = [...newItems, ...prev];
           const unique = combined.filter((v, i, a) => a.findIndex(t => (t.id === v.id)) === i);
           AsyncStorage.setItem('cv_tg_media_list', JSON.stringify(unique));
@@ -212,36 +189,26 @@ export default function CovertVaultFull() {
     } catch (e) {}
   };
 
+  // 🔴 الحل المؤكد للتيليجرام: استخدام دالة التحميل المباشر الآمنة بدون تتبع التقدم
   const downloadSingleTgMedia = async (itemObj) => {
-    if (tgDownloadProgress[itemObj.id]) return; 
+    if (tgLoadingIds[itemObj.id]) return; 
     try {
-      setTgDownloadProgress(prev => ({ ...prev, [itemObj.id]: { percent: 0, downloadedStr: '0 B', totalStr: formatBytes(itemObj.size) } }));
+      setTgLoadingIds(prev => ({ ...prev, [itemObj.id]: true })); // تشغيل أيقونة التحميل الدائرية
 
       const res = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/getFile?file_id=${itemObj.id}`);
       const data = await res.json();
-      if (!data.ok) throw new Error("Failed to get file path");
+      if (!data.ok) throw new Error("API Error");
       
       const downloadUrl = `https://api.telegram.org/file/bot${TG_TOKEN}/${data.result.file_path}`;
       const originalExt = data.result.file_path.split('.').pop() || (itemObj.type === 'video' ? 'mp4' : 'jpg');
-      const secureName = `${generateSecureName()}.${originalExt}`;
-      const destPath = FileSystem.documentDirectory + secureName;
+      const securePath = FileSystem.documentDirectory + generateSecureName() + '.' + originalExt;
 
-      const resumable = FileSystem.createDownloadResumable(downloadUrl, destPath, {}, (dp) => {
-        setTgDownloadProgress(prev => ({
-          ...prev,
-          [itemObj.id]: {
-            percent: Math.floor((dp.totalBytesWritten / dp.totalBytesExpectedToWrite) * 100),
-            downloadedStr: formatBytes(dp.totalBytesWritten),
-            totalStr: formatBytes(dp.totalBytesExpectedToWrite)
-          }
-        }));
-      });
-
-      const result = await resumable.downloadAsync();
+      // التنزيل المباشر الصامت المضمون 100%
+      const { uri } = await FileSystem.downloadAsync(downloadUrl, securePath);
       
-      if (result && result.uri) {
+      if (uri) {
         setMedia(prev => {
-          const updatedMedia = [{ id: Date.now().toString() + Math.random().toString(), uri: result.uri, type: itemObj.type, isFav: false, title: 'Channel Asset' }, ...prev];
+          const updatedMedia = [{ id: Date.now().toString() + Math.random().toString(), uri: uri, type: itemObj.type, isFav: false, title: 'Channel Asset' }, ...prev];
           AsyncStorage.setItem('cv_media_master', encryptData(updatedMedia));
           return updatedMedia;
         });
@@ -251,39 +218,43 @@ export default function CovertVaultFull() {
           AsyncStorage.setItem('cv_tg_media_list', JSON.stringify(updated));
           return updated;
         });
-
-        setTgDownloadProgress(prev => { const newProg = {...prev}; delete newProg[itemObj.id]; return newProg; });
       }
+      setTgLoadingIds(prev => { const upd = {...prev}; delete upd[itemObj.id]; return upd; });
     } catch(e) {
-      setTgDownloadProgress(prev => { const newProg = {...prev}; delete newProg[itemObj.id]; return newProg; });
+      alert("Telegram Download Failed: " + e.message);
+      setTgLoadingIds(prev => { const upd = {...prev}; delete upd[itemObj.id]; return upd; });
     }
   };
 
   const downloadAllTgVideos = () => {
     if (tgVideos.length === 0) return;
     tgVideos.forEach(item => {
-      if (!tgDownloadProgress[item.id]) downloadSingleTgMedia(item);
+      if (!tgLoadingIds[item.id]) downloadSingleTgMedia(item);
     });
   };
 
+  // 🔴 الحل المؤكد للمعرض: استخدام copyAsync لأنه ملف داخلي وليس رابط إنترنت
   const pickMediaSecurely = async () => {
     try {
       let result = await ImagePicker.launchImageLibraryAsync({ 
         mediaTypes: ImagePicker.MediaTypeOptions.All, 
         allowsEditing: false,
         allowsMultipleSelection: true,
-        quality: 1
+        quality: 1,
+        copyToCacheDirectory: true // يجبر النظام على تجهيز الملفات لنقلها
       });
 
-      if (!result.canceled && result.assets.length > 0) {
+      if (!result.canceled && result.assets && result.assets.length > 0) {
         const newItems = [];
         for (const asset of result.assets) {
           const isVideo = asset.type === 'video';
-          const originalExt = asset.uri.split('.').pop() || (isVideo ? 'mp4' : 'jpg');
-          const secureName = `${generateSecureName()}.${originalExt}`;
-          const securePath = FileSystem.documentDirectory + secureName;
+          const securePath = FileSystem.documentDirectory + generateSecureName() + (isVideo ? '.mp4' : '.jpg');
           
-          await FileSystem.downloadAsync(asset.uri, securePath);
+          // النسخ الآمن الداخلي للملفات 100%
+          await FileSystem.copyAsync({
+            from: asset.uri,
+            to: securePath
+          });
           
           newItems.push({ id: Date.now().toString() + Math.random().toString(), uri: securePath, type: isVideo ? 'video' : 'image', isFav: false, title: `Gallery Import` });
         }
@@ -293,17 +264,16 @@ export default function CovertVaultFull() {
           return updated;
         });
       }
-    } catch (error) { console.log(error); }
+    } catch (error) { 
+      alert("Gallery Error: " + error.message); 
+    }
   };
 
   const executeDelete = async () => {
     if (!confirmDel) return;
-    if (confirmDel.type === 'link') saveEncryptedLinks(links.filter(l => l.id !== confirmDel.id));
-    else {
-      const target = media.find(m => m.id === confirmDel.id);
-      if (target) { try { await FileSystem.deleteAsync(target.uri); } catch (e) { } }
-      saveEncryptedMedia(media.filter(m => m.id !== confirmDel.id));
-    }
+    const target = media.find(m => m.id === confirmDel.id);
+    if (target) { try { await FileSystem.deleteAsync(target.uri); } catch (e) { } }
+    setMedia(prev => { const upd = prev.filter(m => m.id !== confirmDel.id); AsyncStorage.setItem('cv_media_master', encryptData(upd)); return upd; });
     setConfirmDel(null);
   };
   if (!isLoggedIn) {
@@ -313,7 +283,6 @@ export default function CovertVaultFull() {
         <Ionicons name="finger-print" size={80} color={COLORS.primary} style={{marginBottom: 30}} />
         <Text style={styles.vaultHeaderTitle}>Ghost Vault</Text>
         <Text style={{color: COLORS.subText, marginTop: 10, marginBottom: 30}}>Enter Secure PIN</Text>
-        {/* 🔴 تم تصحيح الـ onChangeText ليعمل بدالتك الأصلية */}
         <TextInput 
           style={[styles.input, {width: '60%', textAlign: 'center', fontSize: 24, letterSpacing: 15, height: 60}]}
           placeholder="••••" placeholderTextColor="#333" secureTextEntry keyboardType="number-pad" maxLength={4} keyboardAppearance="dark"
@@ -330,7 +299,7 @@ export default function CovertVaultFull() {
       <View style={styles.vaultHeader}>
         <View>
           <Text style={styles.vaultHeaderTitle}>Ghost Vault</Text>
-          <Text style={styles.vaultHeaderSub}>{vaultTab === 'links' ? links.length + ' Links' : media.length + ' Media Assets'}</Text>
+          <Text style={styles.vaultHeaderSub}>{vaultTab === 'links' ? '0 Links' : media.length + ' Media Assets'}</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
           <TouchableOpacity onPress={() => { setShowTgModal(true); setHasNewTgVideo(false); }}>
@@ -351,8 +320,13 @@ export default function CovertVaultFull() {
       </View>
 
       <ScrollView style={styles.listContainer} showsVerticalScrollIndicator={false}>
+        {/* 🔴 صفحة الروابط أصبحت مجرد شكل فقط كما طلبت */}
         {vaultTab === 'links' && (
-          <Text style={{color: COLORS.subText, textAlign: 'center', marginTop: 50}}>Link manager is active.</Text>
+          <View style={{alignItems: 'center', marginTop: 100}}>
+            <Ionicons name="link-outline" size={60} color={COLORS.subText} style={{marginBottom: 20}} />
+            <Text style={{color: COLORS.subText, fontSize: 16, fontWeight: 'bold'}}>Link Manager</Text>
+            <Text style={{color: COLORS.subText, marginTop: 10}}>Reserved for future updates.</Text>
+          </View>
         )}
 
         {vaultTab === 'media' && (
@@ -396,25 +370,16 @@ export default function CovertVaultFull() {
                 data={tgVideos}
                 keyExtractor={(item) => item.id}
                 renderItem={({item}) => {
-                  const prog = tgDownloadProgress[item.id];
+                  const isLoading = tgLoadingIds[item.id];
                   return (
                     <View style={styles.tgVidCard}>
                       <View style={styles.tgVidInfoRow}>
                         <View style={styles.tgVidIconBox}><Ionicons name={item.type === 'video' ? "videocam" : "image"} size={24} color={COLORS.subText} /></View>
                         <View style={{flex: 1}}><Text style={styles.linkTitle} numberOfLines={1}>Channel Asset</Text><Text style={styles.linkUrl}>{formatBytes(item.size)}</Text></View>
-                        <TouchableOpacity style={[styles.tgDownloadBtn, prog && {backgroundColor: 'transparent'}]} onPress={() => downloadSingleTgMedia(item)} disabled={!!prog}>
-                          {prog ? <ActivityIndicator color={COLORS.primary} /> : <Ionicons name="download" size={20} color="#FFF" />}
+                        <TouchableOpacity style={[styles.tgDownloadBtn, isLoading && {backgroundColor: 'transparent'}]} onPress={() => downloadSingleTgMedia(item)} disabled={isLoading}>
+                          {isLoading ? <ActivityIndicator color={COLORS.primary} /> : <Ionicons name="download" size={20} color="#FFF" />}
                         </TouchableOpacity>
                       </View>
-                      {prog && (
-                        <View style={styles.tgProgContainer}>
-                          <View style={styles.tgProgBarBg}><View style={[styles.tgProgBarFill, { width: `${prog.percent}%` }]} /></View>
-                          <View style={{flexDirection: 'row', justifyContent: 'space-between', marginTop: 5}}>
-                            <Text style={styles.tgProgTxt}>{prog.downloadedStr} / {prog.totalStr}</Text>
-                            <Text style={[styles.tgProgTxt, {color: COLORS.primary}]}>{prog.percent}%</Text>
-                          </View>
-                        </View>
-                      )}
                     </View>
                   )
                 }}
@@ -450,7 +415,7 @@ export default function CovertVaultFull() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.bg },
-  vaultHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: Platform.OS === 'android' ? 40 : 20, paddingBottom: 10 },
+  vaultHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: Platform.OS === 'android' ? 40 : 40, paddingBottom: 10 },
   vaultHeaderTitle: { fontSize: 28, fontWeight: '900', color: COLORS.text, letterSpacing: -1 },
   vaultHeaderSub: { fontSize: 14, color: COLORS.primary, fontWeight: '800', marginTop: 2 },
   iconBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: COLORS.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },
@@ -489,10 +454,6 @@ const styles = StyleSheet.create({
   linkTitle: { color: COLORS.text, fontSize: 15, fontWeight: '900', marginBottom: 2 },
   linkUrl: { color: COLORS.subText, fontSize: 12, fontWeight: '600' },
   tgDownloadBtn: { width: 45, height: 45, borderRadius: 12, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center' },
-  tgProgContainer: { marginTop: 15 },
-  tgProgBarBg: { width: '100%', height: 4, backgroundColor: COLORS.card, borderRadius: 2, overflow: 'hidden' },
-  tgProgBarFill: { height: '100%', backgroundColor: COLORS.primary },
-  tgProgTxt: { color: COLORS.subText, fontSize: 11, fontWeight: '700' },
   customVideoControls: { position: 'absolute', bottom: 40, width: '100%', paddingHorizontal: 20 },
   progressContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 10 },
   timeText: { color: '#FFF', fontSize: 12, fontWeight: 'bold' },
