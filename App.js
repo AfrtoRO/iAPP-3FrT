@@ -105,7 +105,7 @@ export default function CovertVaultFull() {
   
   const [links, setLinks] = useState([]);
   const [media, setMedia] = useState([]);
-  const [vaultTab, setVaultTab] = useState('media'); // خليت الميديا هي الافتراضية
+  const [vaultTab, setVaultTab] = useState('media');
   const [activeUrl, setActiveUrl] = useState(null);
   const [activeMedia, setActiveMedia] = useState(null);
 
@@ -127,7 +127,6 @@ export default function CovertVaultFull() {
   const [tgDownloadProgress, setTgDownloadProgress] = useState({});
   const cloudAnim = useRef(new Animated.Value(0)).current;
 
-  // 🔴 رابط السيرفر بتاعك والتوكن للتحميل
   const VPS_API_URL = 'https://el3frt.io/bot';
   const TG_TOKEN = '5865244887:AAH41ra4rwB_hOFL-NF9jtBWr8u-YlrV764'; 
 
@@ -175,13 +174,21 @@ export default function CovertVaultFull() {
   const saveEncryptedLinks = async (data) => { setLinks(data); await AsyncStorage.setItem('cv_links_master', encryptData(data)); };
   const saveEncryptedMedia = async (data) => { setMedia(data); await AsyncStorage.setItem('cv_media_master', encryptData(data)); };
 
-  const authenticate = () => {
-    // الباسوورد الثابت للخزنة (ممكن تغيره)
-    if (authInput === '1234') { 
+  // 🔴 رجعتلك الكود الأصلي بتاعك اللي بيحسب الوقت بالمللي (12 و 24)
+  const getExactPINs = () => {
+    const now = new Date();
+    const h = now.getHours(); const m = now.getMinutes();
+    const h12 = h % 12 || 12;
+    const padM = m < 10 ? '0' + m : m; const padH = h < 10 ? '0' + h : h;
+    return [`${h12}${padM}`, `${h}${padM}`, `${padH}${padM}`];
+  };
+
+  // 🔴 رجعتلك الدالة الأصلية لدخول التطبيق
+  const handleAuthChange = (text) => {
+    setAuthInput(text);
+    if (getExactPINs().includes(text)) { 
+      Keyboard.dismiss(); 
       setIsLoggedIn(true);
-      setAuthInput('');
-      Keyboard.dismiss();
-    } else {
       setAuthInput('');
     }
   };
@@ -306,10 +313,11 @@ export default function CovertVaultFull() {
         <Ionicons name="finger-print" size={80} color={COLORS.primary} style={{marginBottom: 30}} />
         <Text style={styles.vaultHeaderTitle}>Ghost Vault</Text>
         <Text style={{color: COLORS.subText, marginTop: 10, marginBottom: 30}}>Enter Secure PIN</Text>
+        {/* 🔴 تم تصحيح الـ onChangeText ليعمل بدالتك الأصلية */}
         <TextInput 
           style={[styles.input, {width: '60%', textAlign: 'center', fontSize: 24, letterSpacing: 15, height: 60}]}
           placeholder="••••" placeholderTextColor="#333" secureTextEntry keyboardType="number-pad" maxLength={4} keyboardAppearance="dark"
-          value={authInput} onChangeText={t => { setAuthInput(t); if(t.length === 4) { Keyboard.dismiss(); setTimeout(() => authenticate(), 100); } }}
+          value={authInput} onChangeText={handleAuthChange}
         />
       </View>
     );
